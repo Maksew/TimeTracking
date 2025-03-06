@@ -1,55 +1,80 @@
+# Compiled class files
 *.class
 
 # Gradle
 .gradle
+build/
 
-# Package Files #
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Package Files
 *.jar
 *.war
 *.ear
 
-# Eclipse #
-.settings
+# IDE files
+## Eclipse
+.settings/
 .project
 .classpath
 .studio
-target
+.apt_generated
+.factorypath
+.springBeans
 
-# Apple # 
-.DS_Store
-
-# Intellij #
-.idea
+## IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
 # On conserve la définition des sources de données
 !.idea/dataSources/
 !.idea/dataSources.xml
 !.idea/dataSources.local.xml
 !.idea/sqldialects.xml
 
-*.iml
+## VSCode
+.vscode/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
-
-# VSCode
-.vscode
-
-# logback
 logback.out.xml
 
-backend/src/main/resources/public/
-backend/target
-frontend/dist/
-frontend/node/
-frontend/coverage/
-frontend/node_modules/
-frontend/npm-debug.log
-frontend/target
-frontend/test-output
-frontend/tests/e2e/reports
-frontend/tests/unit/coverage
-frontend/yarn-error.log
-frontend/yarn.lock
+# Frontend specific
+## Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+yarn.lock
+package-lock.json
 
+## Build artifacts
+frontend/dist/
+frontend/dist-ssr/
+frontend/target/
+frontend/coverage/
+frontend/node/
+frontend/test-output/
+frontend/tests/e2e/reports/
+frontend/tests/unit/coverage/
+
+## Vue/Vite
+*.local
+.env.local
+.env.*.local
+
+# Backend specific
+backend/src/main/resources/public/
+backend/target/
+
+# Misc
 security/target/
 selenium-debug.log
-
-!.mvn/wrapper/maven-wrapper.jar
