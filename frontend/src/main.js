@@ -8,6 +8,9 @@ import * as directives from 'vuetify/directives'
 import 'vuetify/styles'
 import '@mdi/font/css/materialdesignicons.css'
 
+//Font 
+import './scss/main.scss'
+
 import App from './App.vue'
 import router from './router'
 
