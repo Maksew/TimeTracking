@@ -21,7 +21,7 @@ defineProps({
       <v-card color="#283593" dark class="pa-3 rounded-lg">
         <div class="d-flex">
           <v-avatar color="#1a237e" size="48" class="mr-4">
-            <v-icon>mdi-clipboard-text-outline</v-icon>
+            <v-icon>mdi-close-box-outline</v-icon>
           </v-avatar>
           <div>
             <div class="text-h5 font-weight-bold">{{ tasksToDo }}</div>
@@ -35,7 +35,7 @@ defineProps({
       <v-card color="#283593" dark class="pa-3 rounded-lg">
         <div class="d-flex">
           <v-avatar color="#1a237e" size="48" class="mr-4">
-            <v-icon>mdi-check-circle-outline</v-icon>
+            <v-icon>mdi-checkbox-outline</v-icon>
           </v-avatar>
           <div>
             <div class="text-h5 font-weight-bold">{{ tasksCompleted }}</div>
