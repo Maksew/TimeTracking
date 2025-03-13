@@ -78,3 +78,6 @@ backend/target/
 # Misc
 security/target/
 selenium-debug.log
+
+*.mv.db
+*.trace.db

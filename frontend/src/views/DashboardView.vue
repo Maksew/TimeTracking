@@ -1,17 +1,18 @@
 <script setup>
+import { computed } from 'vue';
+import { useAuthStore } from '@/stores/auth';
 import WelcomeMessage from '@/components/dashboard/WelcomeMessage.vue';
 import StatsOverview from '@/components/dashboard/StatsOverview.vue';
 import DetailedStats from '@/components/dashboard/DetailedStats.vue';
 import TimeSheetComponent from '@/components/timesheet/TimeSheetComponent.vue';
 
-const user = {
-  name: ''
-};
+const authStore = useAuthStore();
+const user = computed(() => authStore.user);
 </script>
 
 <template>
   <div class="dashboard">
-    <WelcomeMessage :username="user.name" />
+    <WelcomeMessage :username="user?.pseudo" />
 
     <StatsOverview />
 
