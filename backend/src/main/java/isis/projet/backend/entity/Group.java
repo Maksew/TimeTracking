@@ -5,7 +5,7 @@ import lombok.*;
 import java.util.*;
 
 @Entity
-@Table(name = "GROUP") // "GROUP" est un mot reserv SQL, peut causer des problèmes
+@Table(name = "\"GROUP\"") // On utilise des guillemets doubles pour échapper le mot réservé SQL
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
