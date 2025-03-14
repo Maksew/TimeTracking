@@ -12,10 +12,13 @@
     <v-row class="px-6" align="center" justify="start" dense>
       <!-- Box 1: Feuille de temps vierge (plus icon) -->
       <v-col cols="12" sm="6" md="3" class="d-flex justify-center mb-6">
-        <FeuilleTempsBox
-          title="Feuille de temps vierge"
-          icon="mdi-plus"
-        />
+        <!-- Wrap the box with a router-link to navigate on click -->
+        <router-link to="/editTimeSheet" style="text-decoration: none;">
+          <FeuilleTempsBox
+            title="Feuille de temps vierge"
+            icon="mdi-plus"
+          />
+        </router-link>
       </v-col>
 
       <!-- Box 2: Révision - Étude -->
@@ -77,5 +80,4 @@ import FeuilleTempsBox from '@/components/timesheet/FeuilleTempsBox.vue'
 </script>
 
 <style scoped>
-
 </style>
