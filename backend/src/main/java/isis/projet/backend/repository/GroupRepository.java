@@ -13,6 +13,6 @@ import java.util.Optional;
 public interface GroupRepository extends JpaRepository<Group, Integer> {
     Optional<Group> findByInvitCode(String invitCode);
 
-    @Query(value = "SELECT g FROM Group g JOIN g.userGroups ug WHERE ug.user.id = ?1")
-    List<Group> findByUserId(Integer userId);
+    @Query("SELECT g FROM Group g JOIN g.userGroups ug WHERE ug.user.id = :userId")
+    List<Group> findByUserId(@Param("userId") Integer userId);
 }

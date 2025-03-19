@@ -15,9 +15,9 @@ public interface TimeSheetRepository extends JpaRepository<TimeSheet, Integer> {
 
     List<TimeSheet> findByEntryDate(LocalDate entryDate);
 
-    @Query("SELECT ts FROM TimeSheet ts JOIN ts.sharedWithUsers swu WHERE swu.userId = ?1")
-    List<TimeSheet> findSharedWithUser(Integer userId);
+    @Query("SELECT ts FROM TimeSheet ts JOIN ts.sharedWithUsers swu WHERE swu.userId = :userId")
+    List<TimeSheet> findSharedWithUser(@Param("userId") Integer userId);
 
-    @Query("SELECT ts FROM TimeSheet ts JOIN ts.sharedWithGroups swg WHERE swg.groupId = ?1")
-    List<TimeSheet> findSharedWithGroup(Integer groupId);
+    @Query("SELECT ts FROM TimeSheet ts JOIN ts.sharedWithGroups swg WHERE swg.groupId = :groupId")
+    List<TimeSheet> findSharedWithGroup(@Param("groupId") Integer groupId);
 }
