@@ -18,3 +18,31 @@ export default async function doAjaxRequest(url, options) {
   // Tout s'est bien passé, on renvoie le résultat
   return result;
 }
+
+/**
+ * Vérifie si un token JWT est expiré
+ * @param {string} token Le token JWT à vérifier
+ * @returns {boolean} True si le token est expiré, sinon false
+ */
+export function isTokenExpired(token) {
+  if (!token) return true;
+
+  try {
+    // Diviser le token en ses trois parties
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+
+    // Décoder la partie payload (deuxième partie)
+    const payload = JSON.parse(atob(parts[1]));
+
+    // Vérifier si le token a une date d'expiration
+    if (!payload.exp) return false;
+
+    // Comparer avec l'heure actuelle
+    const now = Date.now() / 1000;
+    return payload.exp < now;
+  } catch (e) {
+    console.error('Erreur lors de la vérification du token:', e);
+    return true;
+  }
+}

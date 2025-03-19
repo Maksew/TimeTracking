@@ -6,7 +6,8 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     isAuthenticated: false,
-    error: null
+    error: null,
+    token: null
   }),
 
   actions: {
@@ -22,9 +23,12 @@ export const useAuthStore = defineStore('auth', {
         })
 
         this.user = userData
+        this.token = userData.token
         this.isAuthenticated = true
 
+        // Stocker les informations dans localStorage
         localStorage.setItem('user', JSON.stringify(userData))
+        localStorage.setItem('token', userData.token)
 
         return userData
       } catch (error) {
@@ -45,9 +49,12 @@ export const useAuthStore = defineStore('auth', {
         })
 
         this.user = registeredUser
+        this.token = registeredUser.token
         this.isAuthenticated = true
 
+        // Stocker les informations dans localStorage
         localStorage.setItem('user', JSON.stringify(registeredUser))
+        localStorage.setItem('token', registeredUser.token)
 
         return registeredUser
       } catch (error) {
@@ -56,22 +63,83 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async refreshToken() {
+      try {
+        if (!this.token) {
+          throw new Error('Aucun token à rafraîchir')
+        }
+
+        const response = await doAjaxRequest('/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.token}`
+          },
+          body: JSON.stringify({ token: this.token })
+        })
+
+        // Mettre à jour le token
+        this.token = response.token
+        localStorage.setItem('token', response.token)
+
+        return response.token
+      } catch (error) {
+        // Si le rafraîchissement échoue, déconnecter l'utilisateur
+        this.logout()
+        throw error
+      }
+    },
+
     logout() {
       this.user = null
+      this.token = null
       this.isAuthenticated = false
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
     },
 
     initAuth() {
       const storedUser = localStorage.getItem('user')
-      if (storedUser) {
+      const storedToken = localStorage.getItem('token')
+
+      if (storedUser && storedToken) {
         try {
           this.user = JSON.parse(storedUser)
+          this.token = storedToken
           this.isAuthenticated = true
         } catch (error) {
           localStorage.removeItem('user')
+          localStorage.removeItem('token')
         }
       }
+    },
+
+    // Vérifier si le token est expiré
+    isTokenExpired() {
+      if (!this.token) return true
+
+      // Décoder le token JWT (sans bibliothèque)
+      try {
+        const payload = JSON.parse(atob(this.token.split('.')[1]))
+        const expiry = payload.exp * 1000 // Convertir en millisecondes
+        return Date.now() >= expiry
+      } catch (e) {
+        return true
+      }
+    }
+  },
+
+  getters: {
+    getToken() {
+      return this.token
+    },
+
+    getAuthorizationHeader() {
+      return this.token ? `Bearer ${this.token}` : ''
+    },
+
+    getUserRole() {
+      return this.user ? this.user.role : null
     }
   }
 })

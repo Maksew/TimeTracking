@@ -31,6 +31,20 @@ public class AuthDTO {
         private String pseudo;
         private String email;
         private String role;
-        private String token; // need for later jwt integration
+        private String token;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TokenRefreshRequest {
+        private String token;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TokenRefreshResponse {
+        private String token;
     }
 }
