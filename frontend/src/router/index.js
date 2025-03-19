@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from "@/views/DashboardView.vue";
+import EditTimeSheetView from "@/views/EditTimeSheetView.vue" ;
 import { useAuthStore } from '@/stores/auth';
 import { authGuard } from './authGuard';
 
@@ -16,6 +17,12 @@ const router = createRouter({
       path: '/timesheet',
       name: 'timesheet',
       component: () => import('@/views/TimeSheetView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/editTimesheet',
+      name: 'editTimesheet',
+      component: EditTimeSheetView,
       meta: { requiresAuth: true }
     },
     {
