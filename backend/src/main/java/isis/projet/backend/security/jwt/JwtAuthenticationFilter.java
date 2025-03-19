@@ -35,6 +35,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+        String path = request.getRequestURI();
+
+        // Ignorer les endpoints Swagger et H2 Console
+        boolean isSwaggerOrPublicRequest = path.contains("/v3/api-docs") ||
+                path.contains("/swagger-ui") ||
+                path.contains("/swagger-resources") ||
+                path.contains("/webjars") ||
+                path.contains("/h2-console") ||
+                path.contains("/api/auth");
+
+        if (isSwaggerOrPublicRequest) {
+            // Passer au filtre suivant sans vérifier l'authentification
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             String jwt = getJwtFromRequest(request);
 
