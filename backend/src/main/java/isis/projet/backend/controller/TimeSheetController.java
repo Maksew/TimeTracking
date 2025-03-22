@@ -52,4 +52,28 @@ public class TimeSheetController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateTimeSheet(@PathVariable Integer id, @RequestBody TimeSheet timeSheet) {
+        try {
+            if (!id.equals(timeSheet.getId())) {
+                return ResponseEntity.badRequest().body("ID de la feuille de temps incohérent");
+            }
+
+            TimeSheet updatedTimeSheet = timeSheetService.updateTimeSheet(timeSheet);
+            return ResponseEntity.ok(updatedTimeSheet);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTimeSheet(@PathVariable Integer id) {
+        try {
+            timeSheetService.deleteTimeSheet(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
