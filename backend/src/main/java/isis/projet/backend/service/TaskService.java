@@ -25,4 +25,19 @@ public class TaskService {
     public Task createTask(Task task) {
         return taskRepository.save(task);
     }
+
+    public Task updateTask(Task task) {
+        if (task.getId() == null || !taskRepository.existsById(task.getId())) {
+            throw new RuntimeException("Tâche introuvable");
+        }
+        return taskRepository.save(task);
+    }
+
+    public void deleteTask(Integer id) {
+        taskRepository.deleteById(id);
+    }
+
+    public List<Task> getTasksByRepetition(String repetition) {
+        return taskRepository.findByRepetition(repetition);
+    }
 }

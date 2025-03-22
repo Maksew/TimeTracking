@@ -31,4 +31,15 @@ public class TimeSheetService {
         }
         return timeSheetRepository.save(timeSheet);
     }
+
+    public TimeSheet updateTimeSheet(TimeSheet timeSheet) {
+        if (timeSheet.getId() == null || !timeSheetRepository.existsById(timeSheet.getId())) {
+            throw new RuntimeException("Feuille de temps introuvable");
+        }
+        return timeSheetRepository.save(timeSheet);
+    }
+
+    public void deleteTimeSheet(Integer id) {
+        timeSheetRepository.deleteById(id);
+    }
 }
