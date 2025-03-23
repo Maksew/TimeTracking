@@ -1,8 +1,10 @@
 package isis.projet.backend.service;
 
 import isis.projet.backend.entity.TimeSheet;
+import isis.projet.backend.entity.TimeSheetTask;
 import isis.projet.backend.entity.User;
 import isis.projet.backend.repository.TimeSheetRepository;
+import isis.projet.backend.repository.TimeSheetTaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +17,9 @@ public class TimeSheetService {
 
     @Autowired
     private TimeSheetRepository timeSheetRepository;
+
+    @Autowired
+    private TimeSheetTaskRepository timeSheetTaskRepository;
 
     public List<TimeSheet> getAllTimeSheetsByUserId(Integer userId) {
         return timeSheetRepository.findByUserId(userId);
@@ -42,5 +47,12 @@ public class TimeSheetService {
     public void deleteTimeSheet(Integer id) {
         timeSheetRepository.deleteById(id);
     }
-    
+
+    public TimeSheetTask addTaskToTimeSheet(Integer timeSheetId, Integer taskId, Integer duration) {
+        TimeSheetTask timeSheetTask = new TimeSheetTask();
+        timeSheetTask.setTimeSheetId(timeSheetId);
+        timeSheetTask.setTaskId(taskId);
+        timeSheetTask.setDuration(duration);
+        return timeSheetTaskRepository.save(timeSheetTask);
+    }
 }

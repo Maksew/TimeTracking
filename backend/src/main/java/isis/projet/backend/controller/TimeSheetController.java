@@ -1,6 +1,7 @@
 package isis.projet.backend.controller;
 
 import isis.projet.backend.entity.TimeSheet;
+import isis.projet.backend.entity.TimeSheetTask;
 import isis.projet.backend.entity.User;
 import isis.projet.backend.security.jwt.JwtUserDetails;
 import isis.projet.backend.service.TimeSheetService;
@@ -11,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -72,6 +74,21 @@ public class TimeSheetController {
         try {
             timeSheetService.deleteTimeSheet(id);
             return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{timeSheetId}/tasks")
+    public ResponseEntity<?> addTaskToTimeSheet(
+            @PathVariable Integer timeSheetId,
+            @RequestBody Map<String, Object> taskData) {
+        try {
+            Integer taskId = (Integer) taskData.get("taskId");
+            Integer duration = (Integer) taskData.get("duration");
+
+            TimeSheetTask timeSheetTask = timeSheetService.addTaskToTimeSheet(timeSheetId, taskId, duration);
+            return ResponseEntity.ok(timeSheetTask);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
