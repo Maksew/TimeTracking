@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
@@ -24,5 +25,6 @@ public class Task {
 
     // Relation inverse avec TIME_SHEET_TASK (pas dans le SQL mais utile pour JPA)
     @OneToMany(mappedBy = "task")
+    @JsonManagedReference("task-timesheettasks")
     private List<TimeSheetTask> timeSheetTasks = new ArrayList<>();
 }

@@ -1,5 +1,7 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -25,17 +27,21 @@ public class TimeSheet {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonBackReference("user-timesheets")
     private User user;
 
     // Relation inverse avec TIME_SHEET_TASK (pas dans le SQL mais utile pour JPA)
     @OneToMany(mappedBy = "timeSheet")
+    @JsonManagedReference("timesheet-tasks")
     private List<TimeSheetTask> timeSheetTasks = new ArrayList<>();
 
     // Relation inverse avec TIME_SHEET_SHARE_USER
     @OneToMany(mappedBy = "timeSheet")
+    @JsonManagedReference("timesheet-sharedusers")
     private List<TimeSheetShareUser> sharedWithUsers = new ArrayList<>();
 
     // Relation inverse avec TIME_SHEET_SHARE_GROUP
     @OneToMany(mappedBy = "timeSheet")
+    @JsonManagedReference("timesheet-sharedgroups")
     private List<TimeSheetShareGroup> sharedWithGroups = new ArrayList<>();
 }

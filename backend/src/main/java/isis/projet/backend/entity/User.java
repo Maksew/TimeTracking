@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
@@ -30,21 +31,25 @@ public class User {
 
     // Relation inverse avec USER_GROUP (pas dans le SQL mais utile pour JPA)
     @OneToMany(mappedBy = "user")
+    @JsonManagedReference("user-usergroups")
     private List<UserGroup> userGroups = new ArrayList<>();
 
     // Relation inverse avec TIME_SHEET
     @OneToMany(mappedBy = "user")
+    @JsonManagedReference("user-timesheets")
     private List<TimeSheet> timeSheets = new ArrayList<>();
 
     // Relation inverse avec TIME_SHEET_SHARE_USER
     @OneToMany(mappedBy = "user")
+    @JsonManagedReference("user-sharedtimesheets")
     private List<TimeSheetShareUser> sharedTimeSheets = new ArrayList<>();
 
     // Relation inverse avec INVITATION (comme expéditeur)
     @OneToMany(mappedBy = "sender")
+    @JsonManagedReference("user-sentinvitations")
     private List<Invitation> sentInvitations = new ArrayList<>();
 
-    // Relation inverse avec INVITATION (comme destinataire)
     @OneToMany(mappedBy = "recipient")
+    @JsonManagedReference("user-receivedinvitations")
     private List<Invitation> receivedInvitations = new ArrayList<>();
 }

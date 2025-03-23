@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,9 +25,11 @@ public class UserGroup {
 
     @ManyToOne
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JsonBackReference("user-usergroups")
     private User user;
 
     @ManyToOne
     @JoinColumn(name = "group_id", insertable = false, updatable = false)
+    @JsonBackReference("group-usergroups")
     private Group group;
 }

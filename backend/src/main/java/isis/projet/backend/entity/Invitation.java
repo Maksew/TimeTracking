@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -27,13 +28,16 @@ public class Invitation {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonBackReference("user-sentinvitations")
     private User sender;
 
     @ManyToOne
     @JoinColumn(name = "user_id_1", nullable = false)
+    @JsonBackReference("user-receivedinvitations")
     private User recipient;
 
     @ManyToOne
     @JoinColumn(name = "group_id", nullable = false)
+    @JsonBackReference("group-invitations")
     private Group group;
 }

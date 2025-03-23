@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
@@ -24,13 +25,16 @@ public class Group {
 
     // Relation inverse avec USER_GROUP (pas dans le SQL mais utile pour JPA)
     @OneToMany(mappedBy = "group")
+    @JsonManagedReference("group-usergroups")
     private List<UserGroup> userGroups = new ArrayList<>();
 
     // Relation inverse avec TIME_SHEET_SHARE_GROUP
     @OneToMany(mappedBy = "group")
+    @JsonManagedReference("group-sharedtimesheets")
     private List<TimeSheetShareGroup> sharedTimeSheets = new ArrayList<>();
 
     // Relation inverse avec INVITATION
     @OneToMany(mappedBy = "group")
+    @JsonManagedReference("group-invitations")
     private List<Invitation> invitations = new ArrayList<>();
 }

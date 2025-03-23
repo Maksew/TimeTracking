@@ -1,5 +1,6 @@
 package isis.projet.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,9 +25,11 @@ public class TimeSheetShareUser {
 
     @ManyToOne
     @JoinColumn(name = "time_sheet_id", insertable = false, updatable = false)
+    @JsonBackReference("timesheet-sharedusers")
     private TimeSheet timeSheet;
 
     @ManyToOne
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JsonBackReference("user-sharedtimesheets")
     private User user;
 }
