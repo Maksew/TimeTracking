@@ -22,6 +22,14 @@
         <main.basedir>${project.basedir}</main.basedir>
 		<start-class>isis.projet.backend.BackendApplication</start-class>
     </properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+	</dependencies>
 	
 	<modules>
         <module>frontend</module>
