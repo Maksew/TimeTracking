@@ -18,5 +18,30 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(timeSheet)
     })
+  },
+
+  updateTimeSheet(id, timeSheet) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(timeSheet)
+    })
+  },
+
+  deleteTimeSheet(id) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${id}`, {
+      method: 'DELETE'
+    })
+  },
+
+  // Ajouter une tâche à une feuille de temps
+  addTaskToTimeSheet(timeSheetId, taskId, duration) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, duration })
+    })
   }
+
+
 }
