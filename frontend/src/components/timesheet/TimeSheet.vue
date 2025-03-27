@@ -240,24 +240,54 @@ function cancel() {
   window.history.back()
 }
 
-function submit() {
-  // If mode is "date", we rely on selectedDate
-  // If mode is "dhm", we rely on days/hours/minutes
-  const payload = {
-    titre: titre.value,
-    tasks: tasks.value,
-    mode: mode.value
-  }
+async function submit() {
+  try {
+    const payload = {
+      entryDate: mode.value === 'date' ? selectedDate.value : new Date().toISOString().split('T')[0],
+      icon: 'mdi-file-document', // Icône par défaut
+      tasks: tasks.value.map(task => ({
+        name: task.text,
+        repetition: 'NONE'
+      }))
+    };
 
-  if (mode.value === 'date') {
-    payload.selectedDate = selectedDate.value
-  } else {
-    payload.days = days.value
-    payload.hours = hours.value
-    payload.minutes = minutes.value
-  }
+    // Afficher un indicateur de chargement
+    isSubmitting.value = true;
 
-  console.log('Form submitted:', payload)
+    // Créer la feuille de temps
+    const timeSheet = await timeSheetService.createTimeSheet(payload);
+
+    // Ajouter chaque tâche
+    for (const task of tasks.value) {
+      if (task.text.trim()) {
+        // Créer la tâche si elle n'existe pas déjà
+        const taskData = await taskService.createTask({ name: task.text, repetition: 'NONE' });
+
+        // Calculer la durée en minutes
+        let duration = 0;
+        if (mode.value === 'dhm') {
+          duration = (parseInt(days.value) * 24 * 60) +
+            (parseInt(hours.value) * 60) +
+            parseInt(minutes.value);
+        } else {
+          // Calculer la différence entre la date actuelle et la date sélectionnée
+          const diffTime = Math.abs(new Date(selectedDate.value) - new Date());
+          duration = Math.ceil(diffTime / (1000 * 60)); // Convertir en minutes
+        }
+
+        // Ajouter la tâche à la feuille de temps
+        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskData.id, duration);
+      }
+    }
+
+    // Rediriger vers le dashboard après succès
+    router.push('/');
+  } catch (error) {
+    // Gérer les erreurs
+    console.error('Erreur lors de la création de la feuille de temps:', error);
+  } finally {
+    isSubmitting.value = false;
+  }
 }
 
 function formatDate(date) {

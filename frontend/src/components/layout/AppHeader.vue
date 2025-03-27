@@ -40,6 +40,16 @@ const logout = () => {
       >
         Feuille de temps
       </v-btn>
+
+      <v-btn
+        :active="activeTab === 'groups'"
+        variant="flat"
+        color="white"
+        to="/groups"
+      >
+        Groupes
+      </v-btn>
+
     </template>
 
     <v-spacer></v-spacer>

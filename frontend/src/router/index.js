@@ -39,6 +39,12 @@ const router = createRouter({
       path: '/access-denied',
       name: 'access-denied',
       component: () => import('@/views/AccessDeniedView.vue')
+    },
+    {
+      path: '/groups',
+      name: 'groups',
+      component: () => import('@/views/GroupsView.vue'),
+      meta: { requiresAuth: true }
     }
   ],
 })
