@@ -1,16 +1,21 @@
 package isis.projet.backend.controller;
 
 import isis.projet.backend.dto.StatisticsDTO;
+import isis.projet.backend.entity.TimeSheet;
 import isis.projet.backend.security.jwt.JwtUserDetails;
 import isis.projet.backend.service.StatisticsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/statistics")

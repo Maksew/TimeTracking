@@ -6,6 +6,9 @@ import isis.projet.backend.repository.TaskRepository;
 import isis.projet.backend.repository.TimeSheetRepository;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
 import isis.projet.backend.repository.UserRepository;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
