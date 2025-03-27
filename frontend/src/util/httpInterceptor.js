@@ -53,18 +53,35 @@ export async function httpInterceptor(url, options = {}) {
   }
 }
 
-/**
- * Version améliorée de doAjaxRequest avec l'intercepteur
- */
+
 export async function doAjaxRequestWithAuth(url, options = {}) {
-  const response = await httpInterceptor(url, options)
+  const response = await httpInterceptor(url, options);
 
-  // Récupérer le résultat au format JSON
-  const result = await response.json()
+  // Vérifier si la réponse est vide ou non-JSON
+  if (response.status === 204) {
+    // 204 No Content - retourner un objet vide ou une valeur appropriée
+    return {};
+  }
 
-  // Si la réponse n'est pas OK, lever une exception
-  if (!response.ok) throw result
+  // Vérifier si la réponse a du contenu
+  const text = await response.text();
+  if (!text) {
+    // Réponse vide - retourner un objet vide
+    return {};
+  }
 
-  // Tout s'est bien passé, retourner le résultat
-  return result
+  try {
+    // Essayer de parser le JSON
+    const result = JSON.parse(text);
+
+    // Si la réponse n'est pas OK, lever une exception
+    if (!response.ok) throw result;
+
+    // Tout s'est bien passé, retourner le résultat
+    return result;
+  } catch (e) {
+    // Erreur de parsing JSON
+    console.error('Erreur de parsing JSON:', text);
+    throw new Error('Réponse invalide du serveur: ' + text);
+  }
 }

@@ -41,7 +41,11 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskId, duration })
     })
+  },
+
+  shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/share/group/${groupId}?accessLevel=${accessLevel}`, {
+      method: 'POST'
+    });
   }
-
-
 }

@@ -14,16 +14,24 @@ const user = computed(() => authStore.user);
 
 // États pour le chargement et les données
 const loading = ref(true);
+const error = ref(null);
 const timeSheets = ref([]);
 const userGroups = ref([]);
+const statistics = ref(null);
 
 onMounted(async () => {
   try {
-    // Chargement initial des données
-    timeSheets.value = await timeSheetService.getUserTimeSheets();
-    userGroups.value = await groupService.getUserGroups();
-  } catch (error) {
-    console.error("Erreur lors du chargement des données:", error);
+    // Chargement parallèle des données pour optimiser le temps de chargement
+    const [timeSheetsData, userGroupsData] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      groupService.getUserGroups()
+    ]);
+
+    timeSheets.value = timeSheetsData;
+    userGroups.value = userGroupsData;
+  } catch (err) {
+    console.error("Erreur lors du chargement des données:", err);
+    error.value = "Une erreur est survenue lors du chargement des données.";
   } finally {
     loading.value = false;
   }
@@ -31,25 +39,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="dashboard px-6 py-4">
     <WelcomeMessage :username="user?.pseudo" />
 
     <v-overlay v-if="loading" class="d-flex align-center justify-center">
-      <v-progress-circular indeterminate color="primary"></v-progress-circular>
+      <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
     </v-overlay>
 
-    <template v-else>
+    <v-alert v-if="error && !loading" type="error" class="mb-4">
+      {{ error }}
+      <template v-slot:append>
+        <v-btn variant="text" @click="error = null">Fermer</v-btn>
+      </template>
+    </v-alert>
+
+    <template v-if="!loading && !error">
       <StatsOverview />
 
       <v-row>
-        <v-col cols="12" md="7">
+        <v-col cols="12" lg="7" md="7">
           <DetailedStats />
         </v-col>
 
-        <v-col cols="12" md="5">
+        <v-col cols="12" lg="5" md="5">
           <TimeSheetComponent :tasks="timeSheets" :groups="userGroups" />
         </v-col>
       </v-row>
     </template>
   </div>
 </template>
+
+<style scoped>
+.dashboard {
+  background-color: #1a237e;
+  min-height: calc(100vh - 64px); /* Full height minus app bar */
+}
+</style>
