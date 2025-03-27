@@ -126,16 +126,16 @@ export const useAuthStore = defineStore('auth', {
       } catch (e) {
         return true
       }
+    },
+
+    getAuthorizationHeader() {
+      return this.token ? `Bearer ${this.token}` : ''
     }
   },
 
   getters: {
     getToken() {
       return this.token
-    },
-
-    getAuthorizationHeader() {
-      return this.token ? `Bearer ${this.token}` : ''
     },
 
     getUserRole() {

@@ -86,10 +86,18 @@ public class AuthController {
 
                 return ResponseEntity.ok(response);
             } else {
-                return ResponseEntity.badRequest().body("Email ou mot de passe incorrect");
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Email ou mot de passe incorrect");
+                return ResponseEntity.badRequest()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(errorResponse);
             }
         } catch (AuthenticationException e) {
-            return ResponseEntity.badRequest().body("Email ou mot de passe incorrect");
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Email ou mot de passe incorrect");
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(errorResponse);
         }
     }
 

@@ -11,12 +11,25 @@
 export default async function doAjaxRequest(url, options) {
   // On fait l'appel AJAX
   const response = await fetch(url, options);
-  // On récupère le résultat transmis en format JSON
-  const result = await response.json();
-  // L'API a signalé une erreur, on lève une exception
-  if (!response.ok) throw result;
-  // Tout s'est bien passé, on renvoie le résultat
-  return result;
+
+  try {
+    // Récupérer le résultat transmis en format JSON
+    const result = await response.json();
+
+    // L'API a signalé une erreur, on lève une exception
+    if (!response.ok) throw result;
+
+    // Tout s'est bien passé, on renvoie le résultat
+    return result;
+  } catch (error) {
+    // Si erreur de parsing, retourner l'erreur brute
+    if (error instanceof SyntaxError) {
+      console.error("Erreur de parsing JSON:", error);
+      throw new Error("Réponse invalide du serveur");
+    }
+    // Sinon renvoyer l'erreur de l'API (qui est un objet JSON valide)
+    throw error;
+  }
 }
 
 /**
