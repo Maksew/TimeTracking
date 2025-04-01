@@ -67,12 +67,28 @@ public class TimeSheetService {
      * @param timeSheet Feuille de temps à mettre à jour
      * @return Feuille de temps mise à jour
      */
-    public TimeSheet updateTimeSheet(TimeSheet timeSheet) {
-        if (timeSheet.getId() == null || !timeSheetRepository.existsById(timeSheet.getId())) {
+    public TimeSheet updateTimeSheet(TimeSheet updatedTimeSheet) {
+        // Vérifier si l'ID est présent et si la feuille de temps existe dans la base de données
+        if (updatedTimeSheet.getId() == null || !timeSheetRepository.existsById(updatedTimeSheet.getId())) {
             throw new RuntimeException("Feuille de temps introuvable");
         }
-        return timeSheetRepository.save(timeSheet);
+
+        // Récupérer la feuille de temps existante
+        Optional<TimeSheet> optionalExisting = timeSheetRepository.findById(updatedTimeSheet.getId());
+        if (!optionalExisting.isPresent()) {
+            throw new RuntimeException("Feuille de temps introuvable");
+        }
+        TimeSheet existingTimeSheet = optionalExisting.get();
+
+        // Mettre à jour les champs autorisés tout en préservant l'association avec l'utilisateur
+        existingTimeSheet.setEntryDate(updatedTimeSheet.getEntryDate());
+        existingTimeSheet.setIcon(updatedTimeSheet.getIcon());
+        // Ajoutez ici d'autres mises à jour de champs si nécessaire
+
+        // Sauvegarder et retourner la feuille de temps mise à jour
+        return timeSheetRepository.save(existingTimeSheet);
     }
+
 
     /**
      * Supprime une feuille de temps
