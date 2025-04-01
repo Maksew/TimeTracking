@@ -59,9 +59,13 @@ public class GroupService {
 
         return groupRepository.save(group);
     }
-
-    public void deleteGroup(Integer id) {
-        groupRepository.deleteById(id);
+    public void deleteGroup(Integer groupId) {
+        // Retrieve associated UserGroup entries
+        List<UserGroup> associations = userGroupRepository.findByGroupId(groupId);
+        // Delete associations explicitly
+        userGroupRepository.deleteAll(associations);
+        // Now delete the group
+        groupRepository.deleteById(groupId);
     }
 
     public Group joinGroup(String invitCode, User user) {
