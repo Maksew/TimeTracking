@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardView from "@/views/DashboardView.vue";
 import EditTimeSheetView from "@/views/EditTimeSheetView.vue" ;
+import UserProfileView from "@/views/UserProfileView.vue";
 import { useAuthStore } from '@/stores/auth';
 import { authGuard } from './authGuard';
 
@@ -44,6 +45,12 @@ const router = createRouter({
       path: '/groups',
       name: 'groups',
       component: () => import('@/views/GroupsView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: UserProfileView,
       meta: { requiresAuth: true }
     }
   ],

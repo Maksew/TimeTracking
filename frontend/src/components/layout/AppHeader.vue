@@ -55,10 +55,12 @@ const logout = () => {
     <v-spacer></v-spacer>
 
     <div v-if="isAuthenticated" class="d-flex align-center">
-      <span class="mr-2">{{ user.pseudo }}</span>
-      <v-avatar size="36" color="#7986cb" class="mr-2">
-        <span class="text-h6" v-if="user.pseudo">{{ user.pseudo.charAt(0).toUpperCase() }}</span>
-      </v-avatar>
+      <v-btn text to="/profile" class="d-flex align-center">
+        <span class="mr-2">{{ user.pseudo }}</span>
+        <v-avatar size="36" color="#7986cb" class="mr-2">
+          <span class="text-h6" v-if="user.pseudo">{{ user.pseudo.charAt(0).toUpperCase() }}</span>
+        </v-avatar>
+      </v-btn>
 
       <v-btn icon @click="logout">
         <v-icon>mdi-logout</v-icon>

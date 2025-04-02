@@ -11,6 +11,7 @@ import '@mdi/font/css/materialdesignicons.css' // For MDI icons
 
 import App from './App.vue'
 import router from './router'
+import { useAuthStore } from '@/stores/auth';
 
 const vuetify = createVuetify({
   components,
@@ -35,7 +36,15 @@ const vuetify = createVuetify({
 })
 
 const app = createApp(App)
-app.use(createPinia())
+
+const pinia = createPinia();
+app.use(pinia);
+
+const authStore = useAuthStore();
+authStore.initAuth();
+
 app.use(router)
 app.use(vuetify)
 app.mount('#app')
+
+
