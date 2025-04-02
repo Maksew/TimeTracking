@@ -42,6 +42,7 @@ public class TimeSheetService {
     @Autowired
     private GroupRepository groupRepository;
 
+
     /**
      * Récupère toutes les feuilles de temps d'un utilisateur
      * @param userId ID de l'utilisateur
