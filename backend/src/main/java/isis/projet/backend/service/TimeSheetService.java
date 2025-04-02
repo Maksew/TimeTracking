@@ -7,6 +7,7 @@ import isis.projet.backend.repository.TimeSheetShareUserRepository;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
 import isis.projet.backend.repository.TaskRepository;
 import isis.projet.backend.repository.UserRepository;
+import isis.projet.backend.repository.GroupRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +39,8 @@ public class TimeSheetService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private GroupRepository groupRepository;
 
     /**
      * Récupère toutes les feuilles de temps d'un utilisateur
@@ -210,19 +213,33 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithGroup(Integer timeSheetId, Integer groupId, String accessLevel) {
-        // Vérifier si le partage existe déjà
-        TimeSheetShareGroupId id = new TimeSheetShareGroupId(timeSheetId, groupId);
+        // Retrieve the timesheet from the database
+        TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
+                .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
+
+        // Retrieve the group from the database
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Groupe introuvable"));
+
+        // Create the composite key for the share record
+        TimeSheetShareGroupId id = new TimeSheetShareGroupId(timeSheet.getId(), group.getId());
+
         if (timeSheetShareGroupRepository.existsById(id)) {
-            // Mettre à jour le niveau d'accès
+            // Update the access level if the share record already exists
             TimeSheetShareGroup existingShare = timeSheetShareGroupRepository.findById(id).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareGroupRepository.save(existingShare);
         } else {
-            // Créer un nouveau partage
+            // Create a new share record with proper references
             TimeSheetShareGroup shareGroup = new TimeSheetShareGroup();
-            shareGroup.setTimeSheetId(timeSheetId);
-            shareGroup.setGroupId(groupId);
+            shareGroup.setTimeSheetId(timeSheet.getId());
+            shareGroup.setGroupId(group.getId());
             shareGroup.setAccessLevel(accessLevel);
+
+            // Optionally set the associated entities to maintain consistency
+            shareGroup.setTimeSheet(timeSheet);
+            shareGroup.setGroup(group);
+
             timeSheetShareGroupRepository.save(shareGroup);
         }
     }
