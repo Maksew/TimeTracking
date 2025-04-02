@@ -6,6 +6,7 @@ import isis.projet.backend.repository.TimeSheetShareGroupRepository;
 import isis.projet.backend.repository.TimeSheetShareUserRepository;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
 import isis.projet.backend.repository.TaskRepository;
+import isis.projet.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,9 @@ public class TimeSheetService {
 
     @Autowired
     private TaskRepository taskRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
 
     /**
@@ -168,19 +172,33 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithUser(Integer timeSheetId, Integer userId, String accessLevel) {
-        // Vérifier si le partage existe déjà
-        TimeSheetShareUserId id = new TimeSheetShareUserId(timeSheetId, userId);
-        if (timeSheetShareUserRepository.existsById(id)) {
-            // Mettre à jour le niveau d'accès
-            TimeSheetShareUser existingShare = timeSheetShareUserRepository.findById(id).get();
+        // Retrieve the timesheet from the database
+        TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
+                .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
+
+        // Retrieve the user from the database
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // Create the composite key for the share
+        TimeSheetShareUserId shareId = new TimeSheetShareUserId(timeSheet.getId(), user.getId());
+
+        if (timeSheetShareUserRepository.existsById(shareId)) {
+            // Update the access level if the share already exists
+            TimeSheetShareUser existingShare = timeSheetShareUserRepository.findById(shareId).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareUserRepository.save(existingShare);
         } else {
-            // Créer un nouveau partage
+            // Create a new share record with proper references
             TimeSheetShareUser shareUser = new TimeSheetShareUser();
-            shareUser.setTimeSheetId(timeSheetId);
-            shareUser.setUserId(userId);
+            shareUser.setTimeSheetId(timeSheet.getId());
+            shareUser.setUserId(user.getId());
             shareUser.setAccessLevel(accessLevel);
+
+            // Optionally set the associated entities as well
+            shareUser.setTimeSheet(timeSheet);
+            shareUser.setUser(user);
+
             timeSheetShareUserRepository.save(shareUser);
         }
     }
