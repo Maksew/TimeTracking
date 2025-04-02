@@ -8,11 +8,16 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -27,12 +32,22 @@ public class UserService {
     }
 
     public User updateUser(User user) {
-        // verif que l'utilisateur existe déja
-        if (user.getId() == null || !userRepository.existsById(user.getId())) {
-            throw new RuntimeException("Utilisateur introuvable");
-        }
+        // Retrieve the existing user from the database
+        User existingUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        return userRepository.save(user);
+        // Update allowed fields
+        existingUser.setPseudo(user.getPseudo());
+        existingUser.setEmail(user.getEmail());
+        // Check if password is provided and if it's different (i.e. not already encoded)
+        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+            // It's a good idea to check if the password is already encoded, but usually you expect plain text here
+            existingUser.setPassword(passwordEncoder.encode(user.getPassword()));
+        }
+        // Update role or other fields if necessary
+        existingUser.setRole(user.getRole());
+
+        return userRepository.save(existingUser);
     }
 
     public void deleteUser(Integer id) {

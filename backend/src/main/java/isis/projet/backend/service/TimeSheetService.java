@@ -5,6 +5,9 @@ import isis.projet.backend.repository.TimeSheetRepository;
 import isis.projet.backend.repository.TimeSheetShareGroupRepository;
 import isis.projet.backend.repository.TimeSheetShareUserRepository;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
+import isis.projet.backend.repository.TaskRepository;
+import isis.projet.backend.repository.UserRepository;
+import isis.projet.backend.repository.GroupRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +32,15 @@ public class TimeSheetService {
 
     @Autowired
     private TimeSheetShareGroupRepository timeSheetShareGroupRepository;
+
+    @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private GroupRepository groupRepository;
 
     /**
      * Récupère toutes les feuilles de temps d'un utilisateur
@@ -67,12 +79,28 @@ public class TimeSheetService {
      * @param timeSheet Feuille de temps à mettre à jour
      * @return Feuille de temps mise à jour
      */
-    public TimeSheet updateTimeSheet(TimeSheet timeSheet) {
-        if (timeSheet.getId() == null || !timeSheetRepository.existsById(timeSheet.getId())) {
+    public TimeSheet updateTimeSheet(TimeSheet updatedTimeSheet) {
+        // Vérifier si l'ID est présent et si la feuille de temps existe dans la base de données
+        if (updatedTimeSheet.getId() == null || !timeSheetRepository.existsById(updatedTimeSheet.getId())) {
             throw new RuntimeException("Feuille de temps introuvable");
         }
-        return timeSheetRepository.save(timeSheet);
+
+        // Récupérer la feuille de temps existante
+        Optional<TimeSheet> optionalExisting = timeSheetRepository.findById(updatedTimeSheet.getId());
+        if (!optionalExisting.isPresent()) {
+            throw new RuntimeException("Feuille de temps introuvable");
+        }
+        TimeSheet existingTimeSheet = optionalExisting.get();
+
+        // Mettre à jour les champs autorisés tout en préservant l'association avec l'utilisateur
+        existingTimeSheet.setEntryDate(updatedTimeSheet.getEntryDate());
+        existingTimeSheet.setIcon(updatedTimeSheet.getIcon());
+        // Ajoutez ici d'autres mises à jour de champs si nécessaire
+
+        // Sauvegarder et retourner la feuille de temps mise à jour
+        return timeSheetRepository.save(existingTimeSheet);
     }
+
 
     /**
      * Supprime une feuille de temps
@@ -90,12 +118,28 @@ public class TimeSheetService {
      * @return Tâche ajoutée à la feuille de temps
      */
     public TimeSheetTask addTaskToTimeSheet(Integer timeSheetId, Integer taskId, Integer duration) {
-        TimeSheetTask timeSheetTask = new TimeSheetTask();
-        timeSheetTask.setTimeSheetId(timeSheetId);
-        timeSheetTask.setTaskId(taskId);
-        timeSheetTask.setDuration(duration);
+        // Retrieve the timesheet from the database
+        TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
+                .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
+
+        // Retrieve the task from the database
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+
+
+        // Create the TimeSheetTask entity by setting the composite key and relationships
+        TimeSheetTask timeSheetTask = TimeSheetTask.builder()
+                .timeSheetId(timeSheet.getId())
+                .taskId(task.getId())
+                .duration(duration)
+                .timeSheet(timeSheet)
+                .task(task)
+                .build();
+
+        // Save the association entity
         return timeSheetTaskRepository.save(timeSheetTask);
     }
+
 
     /**
      * Récupère les feuilles de temps par date
@@ -131,19 +175,33 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithUser(Integer timeSheetId, Integer userId, String accessLevel) {
-        // Vérifier si le partage existe déjà
-        TimeSheetShareUserId id = new TimeSheetShareUserId(timeSheetId, userId);
-        if (timeSheetShareUserRepository.existsById(id)) {
-            // Mettre à jour le niveau d'accès
-            TimeSheetShareUser existingShare = timeSheetShareUserRepository.findById(id).get();
+        // Retrieve the timesheet from the database
+        TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
+                .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
+
+        // Retrieve the user from the database
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // Create the composite key for the share
+        TimeSheetShareUserId shareId = new TimeSheetShareUserId(timeSheet.getId(), user.getId());
+
+        if (timeSheetShareUserRepository.existsById(shareId)) {
+            // Update the access level if the share already exists
+            TimeSheetShareUser existingShare = timeSheetShareUserRepository.findById(shareId).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareUserRepository.save(existingShare);
         } else {
-            // Créer un nouveau partage
+            // Create a new share record with proper references
             TimeSheetShareUser shareUser = new TimeSheetShareUser();
-            shareUser.setTimeSheetId(timeSheetId);
-            shareUser.setUserId(userId);
+            shareUser.setTimeSheetId(timeSheet.getId());
+            shareUser.setUserId(user.getId());
             shareUser.setAccessLevel(accessLevel);
+
+            // Optionally set the associated entities as well
+            shareUser.setTimeSheet(timeSheet);
+            shareUser.setUser(user);
+
             timeSheetShareUserRepository.save(shareUser);
         }
     }
@@ -155,19 +213,33 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithGroup(Integer timeSheetId, Integer groupId, String accessLevel) {
-        // Vérifier si le partage existe déjà
-        TimeSheetShareGroupId id = new TimeSheetShareGroupId(timeSheetId, groupId);
+        // Retrieve the timesheet from the database
+        TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
+                .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
+
+        // Retrieve the group from the database
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Groupe introuvable"));
+
+        // Create the composite key for the share record
+        TimeSheetShareGroupId id = new TimeSheetShareGroupId(timeSheet.getId(), group.getId());
+
         if (timeSheetShareGroupRepository.existsById(id)) {
-            // Mettre à jour le niveau d'accès
+            // Update the access level if the share record already exists
             TimeSheetShareGroup existingShare = timeSheetShareGroupRepository.findById(id).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareGroupRepository.save(existingShare);
         } else {
-            // Créer un nouveau partage
+            // Create a new share record with proper references
             TimeSheetShareGroup shareGroup = new TimeSheetShareGroup();
-            shareGroup.setTimeSheetId(timeSheetId);
-            shareGroup.setGroupId(groupId);
+            shareGroup.setTimeSheetId(timeSheet.getId());
+            shareGroup.setGroupId(group.getId());
             shareGroup.setAccessLevel(accessLevel);
+
+            // Optionally set the associated entities to maintain consistency
+            shareGroup.setTimeSheet(timeSheet);
+            shareGroup.setGroup(group);
+
             timeSheetShareGroupRepository.save(shareGroup);
         }
     }
