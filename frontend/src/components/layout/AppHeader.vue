@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
@@ -22,34 +22,28 @@ const logout = () => {
     <v-app-bar-title class="font-weight-bold">Time Tracking</v-app-bar-title>
 
     <template v-if="isAuthenticated">
-      <v-btn
-        :active="activeTab === 'dashboard'"
-        variant="flat"
-        color="white"
-        class="ml-4"
-        to="/"
-      >
-        Dashboard
-      </v-btn>
+      <div class="tabs">
+        <div
+          :class="['tab', { active: activeTab === 'dashboard' }]"
+          @click="router.push('/')"
+        >
+          Dashboard
+        </div>
 
-      <v-btn
-        :active="activeTab === 'timesheet'"
-        variant="flat"
-        color="white"
-        to="/timesheet"
-      >
-        Feuille de temps
-      </v-btn>
+        <div
+          :class="['tab', { active: activeTab === 'timesheet' }]"
+          @click="router.push('/timesheet')"
+        >
+          Feuille de temps
+        </div>
 
-      <v-btn
-        :active="activeTab === 'groups'"
-        variant="flat"
-        color="white"
-        to="/groups"
-      >
-        Groupes
-      </v-btn>
-
+        <div
+          :class="['tab', { active: activeTab === 'groups' }]"
+          @click="router.push('/groups')"
+        >
+          Groupes
+        </div>
+      </div>
     </template>
 
     <v-spacer></v-spacer>
@@ -78,3 +72,33 @@ const logout = () => {
     </div>
   </v-app-bar>
 </template>
+
+<style scoped>
+.tabs {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.tab {
+  padding: 8px 16px;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-transform: none;
+  border-radius: 12px;
+}
+
+.tab:hover {
+  background: linear-gradient(to top, rgba(18, 29, 93, 0.5) 0%, rgba(153, 89, 231, 0.5) 77%);
+}
+
+.tab.active {
+  font-weight: bold;
+  background: linear-gradient(to top, rgba(18, 29, 93, 0.5) 0%, rgba(153, 89, 231, 0.5) 77%);
+}
+
+.tab:not(.active) {
+  font-weight: 600;
+}
+</style>
