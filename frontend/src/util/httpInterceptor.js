@@ -53,9 +53,15 @@ export async function httpInterceptor(url, options = {}) {
   }
 }
 
-
+/**
+ * Fonction pour faire des requêtes AJAX avec authentification
+ * Traite les réponses et gère les erreurs courantes
+ */
 export async function doAjaxRequestWithAuth(url, options = {}) {
-  const response = await httpInterceptor(url, options);
+  const baseUrl = 'http://localhost:8989'; // Base URL de votre API
+  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+
+  const response = await httpInterceptor(fullUrl, options);
 
   // Vérifier si la réponse est vide ou non-JSON
   if (response.status === 204) {

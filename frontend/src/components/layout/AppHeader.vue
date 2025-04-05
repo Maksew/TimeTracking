@@ -18,27 +18,27 @@ const logout = () => {
 </script>
 
 <template>
-  <v-app-bar color="#1a237e" dark flat>
+  <v-app-bar color="#1a237e" dark flat class="app-header">
     <v-app-bar-title class="font-weight-bold">Time Tracking</v-app-bar-title>
 
     <template v-if="isAuthenticated">
-      <div class="tabs">
+      <div class="nav-tabs">
         <div
-          :class="['tab', { active: activeTab === 'dashboard' }]"
+          :class="['nav-tab', { active: activeTab === 'dashboard' }]"
           @click="router.push('/')"
         >
           Dashboard
         </div>
 
         <div
-          :class="['tab', { active: activeTab === 'timesheet' }]"
+          :class="['nav-tab', { active: activeTab === 'timesheet' }]"
           @click="router.push('/timesheet')"
         >
           Feuille de temps
         </div>
 
         <div
-          :class="['tab', { active: activeTab === 'groups' }]"
+          :class="['nav-tab', { active: activeTab === 'groups' }]"
           @click="router.push('/groups')"
         >
           Groupes
@@ -49,16 +49,14 @@ const logout = () => {
     <v-spacer></v-spacer>
 
     <div v-if="isAuthenticated" class="d-flex align-center">
-      <v-btn text to="/profile" class="d-flex align-center">
-        <span class="mr-2">{{ user.pseudo }}</span>
-        <v-avatar size="36" color="#7986cb" class="mr-2">
-          <span class="text-h6" v-if="user.pseudo">{{ user.pseudo.charAt(0).toUpperCase() }}</span>
-        </v-avatar>
-      </v-btn>
+      <span class="user-name mr-2">{{ user && user.pseudo ? user.pseudo : 'TEST' }}</span>
+      <v-avatar color="#7986cb" size="36" class="mr-3">
+        <span class="text-h6" v-if="user && user.pseudo">{{ user.pseudo.charAt(0).toUpperCase() }}</span>
+        <span class="text-h6" v-else>T</span>
+      </v-avatar>
 
-      <v-btn icon @click="logout">
+      <v-btn icon class="logout-btn" @click="logout">
         <v-icon>mdi-logout</v-icon>
-        <v-tooltip activator="parent" location="bottom">Se déconnecter</v-tooltip>
       </v-btn>
     </div>
 
@@ -74,31 +72,45 @@ const logout = () => {
 </template>
 
 <style scoped>
-.tabs {
-  display: flex;
-  gap: 16px;
-  align-items: center;
+.app-header {
+  border-bottom: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
-.tab {
+.nav-tabs {
+  display: flex;
+  margin-left: 20px;
+}
+
+.nav-tab {
   padding: 8px 16px;
   color: white;
   font-weight: 600;
+  cursor: pointer;
   transition: all 0.3s ease;
-  text-transform: none;
-  border-radius: 12px;
+  margin: 0 4px;
+  border-radius: 8px;
 }
 
-.tab:hover {
-  background: linear-gradient(to top, rgba(18, 29, 93, 0.5) 0%, rgba(153, 89, 231, 0.5) 77%);
+.nav-tab:hover {
+  background: rgba(153, 89, 231, 0.2);
 }
 
-.tab.active {
+.nav-tab.active {
   font-weight: bold;
   background: linear-gradient(to top, rgba(18, 29, 93, 0.5) 0%, rgba(153, 89, 231, 0.5) 77%);
 }
 
-.tab:not(.active) {
-  font-weight: 600;
+.user-name {
+  font-weight: 500;
+}
+
+.logout-btn {
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.logout-btn:hover {
+  opacity: 1;
 }
 </style>
