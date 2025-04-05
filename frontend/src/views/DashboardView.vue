@@ -70,6 +70,8 @@ const currentDate = computed(() => {
   background-color: #1a237e;
   min-height: calc(100vh - 64px); /* Hauteur totale moins la barre de navigation */
   padding: 0;
+  /* Ajouter un padding-top pour créer de l'espace sous la barre de navigation */
+  padding-top: 24px;
 }
 
 .date-header {
@@ -78,6 +80,9 @@ const currentDate = computed(() => {
   font-size: 1.25rem;
   margin: 0;
   padding: 16px 24px;
+  /* Ajuster le padding du header de date */
+  padding-top: 0;
+  margin-bottom: 16px;
 }
 
 .dashboard-container {
@@ -85,7 +90,9 @@ const currentDate = computed(() => {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr);
   gap: 16px;
   padding: 0 16px 16px 16px;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 180px); /* Ajuster cette valeur pour laisser plus d'espace */
+  /* Ajouter une marge en haut pour séparer du header de date */
+  margin-top: 16px;
 }
 
 /* En dessous de 960px, passer en une seule colonne */

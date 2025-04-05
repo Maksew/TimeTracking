@@ -75,6 +75,8 @@ const logout = () => {
 .app-header {
   border-bottom: none !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  /* Assurer une hauteur fixe pour la barre de navigation */
+  height: 64px !important;
 }
 
 .nav-tabs {

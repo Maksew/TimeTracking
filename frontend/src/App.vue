@@ -36,9 +36,9 @@ import AppHeader from '@/components/layout/AppHeader.vue';
   margin: 0 !important;
 }
 
-/* Suppression complète des marges de v-main */
+/* Suppression complète des marges de v-main avec ajustement pour l'app-bar */
 .v-main {
-  padding-top: 0 !important;
+  padding-top: 64px !important; /* Doit correspondre à la hauteur de l'AppHeader */
 }
 
 /* Éliminer le padding du content wrapper */
