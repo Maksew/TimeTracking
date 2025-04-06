@@ -88,6 +88,12 @@
             </v-btn>
           </div>
 
+          <!-- Alerte explicative sur la durée -->
+          <v-alert type="info" variant="tonal" class="mb-3">
+            La <strong>durée</strong> indiquée représente l'<strong>objectif</strong> ou la <strong>périodicité</strong> de la tâche.
+            Le temps réellement passé sera mesuré avec le chronomètre sur le tableau de bord.
+          </v-alert>
+
           <v-card class="mb-4" color="#1A237E">
             <div ref="tasksContainer" class="pa-2">
               <div
@@ -112,18 +118,24 @@
                   @change="unsavedChanges = true"
                 />
 
-                <!-- Task Duration -->
-                <v-text-field
-                  v-model="task.duration"
-                  label="Durée (min)"
-                  variant="outlined"
-                  density="compact"
-                  hide-details="auto"
-                  type="number"
-                  style="max-width: 110px; background-color: rgba(255,255,255,0.05); color: #FFF;"
-                  class="mr-2"
-                  @change="unsavedChanges = true"
-                />
+                <!-- Task Duration avec tooltip explicatif -->
+                <v-tooltip location="top">
+                  <template v-slot:activator="{ props }">
+                    <div class="mr-2" v-bind="props">
+                      <v-text-field
+                        v-model="task.duration"
+                        label="Durée (min)"
+                        variant="outlined"
+                        density="compact"
+                        hide-details="auto"
+                        type="number"
+                        style="max-width: 110px; background-color: rgba(255,255,255,0.05); color: #FFF;"
+                        @change="unsavedChanges = true"
+                      />
+                    </div>
+                  </template>
+                  <span>Objectif ou périodicité, pas le temps réel</span>
+                </v-tooltip>
 
                 <!-- Remove Task -->
                 <v-btn icon color="error" size="small" @click="removeTask(index)">

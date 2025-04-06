@@ -2,7 +2,9 @@ package isis.projet.backend.controller;
 
 import isis.projet.backend.entity.TimeSheet;
 import isis.projet.backend.entity.TimeSheetTask;
+import isis.projet.backend.entity.TimeSheetTaskId;
 import isis.projet.backend.entity.User;
+import isis.projet.backend.repository.TimeSheetTaskRepository;
 import isis.projet.backend.security.jwt.JwtUserDetails;
 import isis.projet.backend.service.TimeSheetService;
 import isis.projet.backend.service.UserService;
@@ -30,6 +32,9 @@ public class TimeSheetController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private TimeSheetTaskRepository timeSheetTaskRepository;
 
     /**
      * Récupère toutes les feuilles de temps de l'utilisateur connecté
@@ -248,5 +253,32 @@ public class TimeSheetController {
         headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
 
         return new ResponseEntity<>(csvData, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Met à jour la durée d'une tâche dans une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param taskId ID de la tâche
+     * @param taskData Données de la tâche à mettre à jour
+     * @return Statut de l'opération
+     */
+    @PutMapping("/{timeSheetId}/tasks/{taskId}")
+    public ResponseEntity<?> updateTaskDuration(
+            @PathVariable Integer timeSheetId,
+            @PathVariable Integer taskId,
+            @RequestBody Map<String, Integer> taskData) {
+        try {
+            Integer duration = taskData.get("duration");
+            if (duration == null) {
+                return ResponseEntity.badRequest().body("La durée est requise");
+            }
+
+            // Utiliser le service pour mettre à jour la durée
+            TimeSheetTask updatedTask = timeSheetService.updateTaskDuration(timeSheetId, taskId, duration);
+
+            return ResponseEntity.ok(updatedTask);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
