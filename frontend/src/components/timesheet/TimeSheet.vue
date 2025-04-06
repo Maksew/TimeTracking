@@ -1,3 +1,292 @@
+<script setup>
+import { ref, onMounted, nextTick, computed, watch, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import Sortable from 'sortablejs'
+import timeSheetService from '@/services/timeSheetService'
+import taskService from '@/services/taskService'
+import groupService from '@/services/groupService'
+
+const router = useRouter()
+const route = useRoute()
+
+// État d'édition
+const isEditing = ref(false)
+const templateId = ref(null)
+const unsavedChanges = ref(false)
+const showSavePrompt = ref(false)
+
+// État de soumission et messages
+const isSubmitting = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+
+// Informations du formulaire
+const titre = ref('')
+const selectedIcon = ref('mdi-file-document')
+const tasks = ref([])
+const nextTaskId = ref(1)
+
+// Dates de validité
+const startDate = ref(new Date().toISOString().split('T')[0])
+const endDate = ref((() => {
+  const date = new Date()
+  date.setDate(date.getDate() + 14) // Par défaut, 2 semaines de validité
+  return date.toISOString().split('T')[0]
+})())
+const startDateMenu = ref(false)
+const endDateMenu = ref(false)
+
+const formattedStartDate = computed(() => {
+  return formatDate(startDate.value)
+})
+
+const formattedEndDate = computed(() => {
+  return formatDate(endDate.value)
+})
+
+// Partage de groupe
+const userGroups = ref([])
+const selectedGroup = ref(null)
+const personalGroupId = ref('personnel')
+
+// Icônes disponibles
+const availableIcons = [
+  'mdi-file-document',
+  'mdi-briefcase',
+  'mdi-school',
+  'mdi-home',
+  'mdi-run',
+  'mdi-food',
+  'mdi-brain',
+  'mdi-heart',
+  'mdi-leaf',
+  'mdi-palette'
+]
+
+// Reference pour SortableJS container
+const tasksContainer = ref(null)
+
+// Fonction pour avertir l'utilisateur quand il tente de quitter avec des modifications non enregistrées
+const handleBeforeUnload = (e) => {
+  if (unsavedChanges.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+// Récupérer les groupes pour le partage
+onMounted(async () => {
+  // Ajouter l'écouteur d'événement beforeunload
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  // Initialiser le drag-and-drop
+  nextTick(() => {
+    if (tasksContainer.value) {
+      Sortable.create(tasksContainer.value, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: (evt) => {
+          // Reordonner les tâches
+          if (evt.oldIndex !== evt.newIndex) {
+            const movedItem = tasks.value.splice(evt.oldIndex, 1)[0]
+            tasks.value.splice(evt.newIndex, 0, movedItem)
+            // Forcer la réactivité Vue
+            tasks.value = [...tasks.value]
+            unsavedChanges.value = true
+          }
+        }
+      })
+    }
+
+    // Vérifier s'il s'agit d'une édition (templateId dans l'URL)
+    const template = route.query.template
+    if (template) {
+      templateId.value = parseInt(template)
+      isEditing.value = true
+      loadTemplate(templateId.value)
+    } else {
+      // Nouvelle feuille, ajouter une tâche vide
+      addTask()
+    }
+
+    // Récupérer les groupes de l'utilisateur
+    loadUserGroups()
+  })
+})
+
+// Cleanup quand le composant est détruit
+onUnmounted(() => {
+  // Supprimer l'écouteur d'événement beforeunload
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+// Méthodes
+async function loadTemplate(id) {
+  try {
+    const template = await timeSheetService.getTimeSheetById(id)
+
+    // Remplir les champs du formulaire
+    titre.value = template.title || ''
+    selectedIcon.value = template.icon || 'mdi-file-document'
+
+    // Dates de validité
+    if (template.startDate) {
+      startDate.value = template.startDate
+    }
+    if (template.endDate) {
+      endDate.value = template.endDate
+    }
+
+    // Charger les tâches
+    if (template.timeSheetTasks && template.timeSheetTasks.length > 0) {
+      tasks.value = template.timeSheetTasks.map(tst => ({
+        id: nextTaskId.value++,
+        name: tst.task?.name || `Tâche ${tst.taskId}`,
+        taskId: tst.taskId,
+        duration: tst.duration || 0
+      }))
+    } else {
+      addTask() // Au moins une tâche vide
+    }
+
+    // Groupe associé
+    if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
+      selectedGroup.value = template.sharedWithGroups[0].groupId
+    } else {
+      // Si pas de groupe associé, utiliser le groupe Personnel par défaut
+      selectedGroup.value = personalGroupId.value
+    }
+
+    // Réinitialiser l'état des modifications
+    unsavedChanges.value = false
+  } catch (error) {
+    console.error('Erreur lors du chargement du modèle:', error)
+    errorMessage.value = "Impossible de charger le modèle de feuille de temps."
+  }
+}
+
+async function loadUserGroups() {
+  try {
+    const groups = await groupService.getUserGroups()
+    userGroups.value = groups
+  } catch (error) {
+    console.error('Erreur lors du chargement des groupes:', error)
+  }
+}
+
+function addTask() {
+  tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }) // Toujours commencer à 0
+  unsavedChanges.value = true
+}
+
+function removeTask(index) {
+  tasks.value.splice(index, 1)
+  unsavedChanges.value = true
+}
+
+function goBack() {
+  if (unsavedChanges.value) {
+    showSavePrompt.value = true
+  } else {
+    router.back()
+  }
+}
+
+function goBackWithoutSaving() {
+  showSavePrompt.value = false
+  unsavedChanges.value = false
+  router.back()
+}
+
+async function submit() {
+  // Valider le formulaire
+  if (!titre.value.trim()) {
+    errorMessage.value = "Le titre est obligatoire."
+    return
+  }
+
+  if (tasks.value.length === 0 || tasks.value.every(task => !task.name.trim())) {
+    errorMessage.value = "Veuillez ajouter au moins une tâche."
+    return
+  }
+
+  try {
+    isSubmitting.value = true
+    errorMessage.value = ''
+
+    // Préparer les données
+    const timeSheetData = {
+      entryDate: new Date().toISOString().split('T')[0],
+      title: titre.value,
+      icon: selectedIcon.value,
+      startDate: startDate.value,
+      endDate: endDate.value
+    }
+
+    // Créer ou mettre à jour la feuille de temps
+    let timeSheet
+    if (isEditing.value) {
+      timeSheetData.id = templateId.value
+      timeSheet = await timeSheetService.updateTimeSheet(templateId.value, timeSheetData)
+    } else {
+      timeSheet = await timeSheetService.createTimeSheet(timeSheetData)
+    }
+
+    // Ajouter ou mettre à jour les tâches
+    for (const task of tasks.value) {
+      if (task.name.trim()) {
+        // Créer la tâche si nécessaire
+        let taskId = task.taskId
+        if (!taskId) {
+          const taskData = await taskService.createTask({
+            name: task.name,
+            repetition: 'NONE'
+          })
+          taskId = taskData.id
+        }
+
+        // Ajouter la tâche à la feuille de temps avec durée 0
+        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0)
+      }
+    }
+
+    // Partager avec le groupe si sélectionné (et que ce n'est pas le groupe Personnel virtuel)
+    if (selectedGroup.value && selectedGroup.value !== 'personnel') {
+      await timeSheetService.shareTimeSheetWithGroup(timeSheet.id, selectedGroup.value, 'READ')
+    }
+
+    // Succès
+    successMessage.value = `Feuille de temps ${isEditing.value ? 'mise à jour' : 'créée'} avec succès!`
+    unsavedChanges.value = false
+
+    // Rediriger après un court délai
+    setTimeout(() => {
+      router.push('/')
+    }, 1500)
+  } catch (error) {
+    console.error('Erreur lors de la soumission:', error)
+    errorMessage.value = `Une erreur est survenue: ${error.message || 'Veuillez réessayer.'}`
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function formatDate(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+// Observer les changements pour détecter les modifications non enregistrées
+watch([titre, selectedIcon, tasks, selectedGroup, startDate, endDate], () => {
+  unsavedChanges.value = true
+})
+</script>
+
 <template>
   <v-container fluid class="py-6 px-6" style="background-color: #2C2C5E;">
     <!-- Main Card -->
@@ -19,19 +308,6 @@
           <v-icon left class="mr-2">mdi-file-document-edit</v-icon>
           {{ isEditing ? 'Modifier la feuille de temps' : 'Nouvelle feuille de temps' }}
         </v-card-title>
-
-        <template v-slot:append>
-          <v-btn
-            color="primary"
-            icon
-            @click="submit"
-            :loading="isSubmitting"
-            :disabled="isSubmitting || tasks.every(task => !task.name.trim())"
-          >
-            <v-icon>mdi-content-save</v-icon>
-            <v-tooltip activator="parent" location="bottom">{{ isEditing ? 'Mettre à jour' : 'Créer' }}</v-tooltip>
-          </v-btn>
-        </template>
       </v-card-item>
 
       <v-divider class="mb-4"></v-divider>
@@ -209,7 +485,7 @@
           color="primary"
           @click="submit"
           :loading="isSubmitting"
-          :disabled="isSubmitting || tasks.every(task => !task.text.trim())"
+          :disabled="isSubmitting || tasks.every(task => !task.name.trim())"
         >
           {{ isEditing ? 'Mettre à jour' : 'Créer' }}
         </v-btn>
@@ -239,300 +515,6 @@
     </v-dialog>
   </v-container>
 </template>
-
-<script setup>
-import { ref, onMounted, nextTick, computed, watch, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import Sortable from 'sortablejs'
-import timeSheetService from '@/services/timeSheetService'
-import taskService from '@/services/taskService'
-import groupService from '@/services/groupService'
-
-const router = useRouter()
-const route = useRoute()
-
-// État d'édition
-const isEditing = ref(false)
-const templateId = ref(null)
-const unsavedChanges = ref(false)
-const showSavePrompt = ref(false)
-
-// État de soumission et messages
-const isSubmitting = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-
-// Informations du formulaire
-const titre = ref('')
-const selectedIcon = ref('mdi-file-document')
-const tasks = ref([])
-const nextTaskId = ref(1)
-
-// Dates de validité
-const startDate = ref(new Date().toISOString().split('T')[0])
-const endDate = ref((() => {
-  const date = new Date()
-  date.setDate(date.getDate() + 14) // Par défaut, 2 semaines de validité
-  return date.toISOString().split('T')[0]
-})())
-const startDateMenu = ref(false)
-const endDateMenu = ref(false)
-
-const formattedStartDate = computed(() => {
-  return formatDate(startDate.value)
-})
-
-const formattedEndDate = computed(() => {
-  return formatDate(endDate.value)
-})
-
-// Partage de groupe
-const userGroups = ref([])
-const selectedGroup = ref(null)
-
-// Icônes disponibles
-const availableIcons = [
-  'mdi-file-document',
-  'mdi-briefcase',
-  'mdi-school',
-  'mdi-home',
-  'mdi-run',
-  'mdi-food',
-  'mdi-brain',
-  'mdi-heart',
-  'mdi-leaf',
-  'mdi-palette'
-]
-
-// Reference pour SortableJS container
-const tasksContainer = ref(null)
-
-// Fonction pour avertir l'utilisateur quand il tente de quitter avec des modifications non enregistrées
-const handleBeforeUnload = (e) => {
-  if (unsavedChanges.value) {
-    e.preventDefault()
-    e.returnValue = ''
-  }
-}
-
-// Récupérer les groupes pour le partage
-onMounted(async () => {
-  // Ajouter l'écouteur d'événement beforeunload
-  window.addEventListener('beforeunload', handleBeforeUnload)
-
-  // Initialiser le drag-and-drop
-  nextTick(() => {
-    if (tasksContainer.value) {
-      Sortable.create(tasksContainer.value, {
-        handle: '.drag-handle',
-        animation: 150,
-        onEnd: (evt) => {
-          // Reordonner les tâches
-          if (evt.oldIndex !== evt.newIndex) {
-            const movedItem = tasks.value.splice(evt.oldIndex, 1)[0]
-            tasks.value.splice(evt.newIndex, 0, movedItem)
-            // Forcer la réactivité Vue
-            tasks.value = [...tasks.value]
-            unsavedChanges.value = true
-          }
-        }
-      })
-    }
-
-    // Vérifier s'il s'agit d'une édition (templateId dans l'URL)
-    const template = route.query.template
-    if (template) {
-      templateId.value = parseInt(template)
-      isEditing.value = true
-      loadTemplate(templateId.value)
-    } else {
-      // Nouvelle feuille, ajouter une tâche vide
-      addTask()
-    }
-
-    // Récupérer les groupes de l'utilisateur
-    loadUserGroups()
-  })
-})
-
-// Cleanup quand le composant est détruit
-onUnmounted(() => {
-  // Supprimer l'écouteur d'événement beforeunload
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-})
-
-// Méthodes
-async function loadTemplate(id) {
-  try {
-    const template = await timeSheetService.getTimeSheetById(id)
-
-    // Remplir les champs du formulaire
-    titre.value = template.title || ''
-    selectedIcon.value = template.icon || 'mdi-file-document'
-
-    // Dates de validité
-    if (template.startDate) {
-      startDate.value = template.startDate
-    }
-    if (template.endDate) {
-      endDate.value = template.endDate
-    }
-
-    // Charger les tâches
-    if (template.timeSheetTasks && template.timeSheetTasks.length > 0) {
-      tasks.value = template.timeSheetTasks.map(tst => ({
-        id: nextTaskId.value++,
-        name: tst.task?.name || `Tâche ${tst.taskId}`,
-        taskId: tst.taskId,
-        duration: tst.duration || 0
-      }))
-    } else {
-      addTask() // Au moins une tâche vide
-    }
-
-    // Groupe associé
-    if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
-      selectedGroup.value = template.sharedWithGroups[0].groupId
-    } else {
-      // Si pas de groupe associé, utiliser le groupe Personnel par défaut
-      selectedGroup.value = personalGroupId.value
-    }
-
-    // Réinitialiser l'état des modifications
-    unsavedChanges.value = false
-  } catch (error) {
-    console.error('Erreur lors du chargement du modèle:', error)
-    errorMessage.value = "Impossible de charger le modèle de feuille de temps."
-  }
-}
-
-async function loadUserGroups() {
-  try {
-    const groups = await groupService.getUserGroups()
-    userGroups.value = groups
-
-    // Chercher le groupe "Personnel" existant
-    const personalGroup = groups.find(g => g.name === "Personnel")
-    if (personalGroup) {
-      personalGroupId.value = personalGroup.id
-    }
-  } catch (error) {
-    console.error('Erreur lors du chargement des groupes:', error)
-  }
-}
-
-function addTask() {
-  tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }) // Toujours commencer à 0
-  unsavedChanges.value = true
-}
-
-function removeTask(index) {
-  tasks.value.splice(index, 1)
-  unsavedChanges.value = true
-}
-
-function goBack() {
-  if (unsavedChanges.value) {
-    showSavePrompt.value = true
-  } else {
-    router.back()
-  }
-}
-
-function goBackWithoutSaving() {
-  showSavePrompt.value = false
-  unsavedChanges.value = false
-  router.back()
-}
-
-async function submit() {
-  // Valider le formulaire
-  if (!titre.value.trim()) {
-    errorMessage.value = "Le titre est obligatoire."
-    return
-  }
-
-  if (tasks.value.length === 0 || tasks.value.every(task => !task.name.trim())) {
-    errorMessage.value = "Veuillez ajouter au moins une tâche."
-    return
-  }
-
-  try {
-    isSubmitting.value = true
-    errorMessage.value = ''
-
-    // Préparer les données
-    const timeSheetData = {
-      entryDate: new Date().toISOString().split('T')[0],
-      title: titre.value,
-      icon: selectedIcon.value,
-      startDate: startDate.value,
-      endDate: endDate.value
-    }
-
-    // Créer ou mettre à jour la feuille de temps
-    let timeSheet
-    if (isEditing.value) {
-      timeSheetData.id = templateId.value
-      timeSheet = await timeSheetService.updateTimeSheet(templateId.value, timeSheetData)
-    } else {
-      timeSheet = await timeSheetService.createTimeSheet(timeSheetData)
-    }
-
-    // Ajouter ou mettre à jour les tâches
-    for (const task of tasks.value) {
-      if (task.name.trim()) {
-        // Créer la tâche si nécessaire
-        let taskId = task.taskId
-        if (!taskId) {
-          const taskData = await taskService.createTask({
-            name: task.name,
-            repetition: 'NONE'
-          })
-          taskId = taskData.id
-        }
-
-        // Ajouter la tâche à la feuille de temps avec durée 0
-        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0)
-      }
-    }
-
-    // Partager avec le groupe si sélectionné (et que ce n'est pas le groupe Personnel virtuel)
-    if (selectedGroup.value && selectedGroup.value !== 'personnel') {
-      await timeSheetService.shareTimeSheetWithGroup(timeSheet.id, selectedGroup.value, 'READ')
-    }
-
-    // Succès
-    successMessage.value = `Feuille de temps ${isEditing.value ? 'mise à jour' : 'créée'} avec succès!`
-    unsavedChanges.value = false
-
-    // Rediriger après un court délai
-    setTimeout(() => {
-      router.push('/')
-    }, 1500)
-  } catch (error) {
-    console.error('Erreur lors de la soumission:', error)
-    errorMessage.value = `Une erreur est survenue: ${error.message || 'Veuillez réessayer.'}`
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-function formatDate(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-}
-
-// Observer les changements pour détecter les modifications non enregistrées
-watch([titre, selectedIcon, tasks, selectedGroup, startDate, endDate], () => {
-  unsavedChanges.value = true
-})
-</script>
 
 <style scoped>
 .drag-handle {

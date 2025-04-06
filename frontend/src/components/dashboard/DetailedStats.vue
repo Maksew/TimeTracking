@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import statisticsService from '@/services/statisticsService';
 import groupService from '@/services/groupService';
 
@@ -8,6 +8,7 @@ const selectedTab = ref('global');
 const selectedGroup = ref(null);
 const loading = ref(true);
 const error = ref(null);
+const expandedPanels = ref([]);  // Pour contrôler les panneaux d'expansion
 
 // Données
 const groups = ref([]);
@@ -22,24 +23,32 @@ const fetchGlobalStats = async () => {
     statistics.value = response;
 
     if (response.categories && response.categories.length > 0) {
-      // Transformer les catégories en format pour l'affichage
+      // Garder les catégories telles quelles, sans transformation
       taskStats.value = response.categories.map(category => ({
-        category: category.category || 'Catégorie par défaut',
+        id: category.category,  // Identifiant unique pour le panneau
+        title: category.category || 'Catégorie par défaut',
         tasks: category.tasks.map(task => ({
+          id: task.taskId,
           name: task.taskName,
           time: `${task.totalTimeInMinutes} min`,
+          value: task.totalTimeInMinutes,
           completion: task.percentageOfTotal || 0,
+          color: task.completion >= 100 ? 'green' : 'purple',
           icon: task.icon || 'mdi-clipboard-check-outline'
         }))
       }));
     } else {
       // Données par défaut si aucune catégorie n'existe
       taskStats.value = [{
-        category: 'Aucune catégorie',
+        id: 'default',
+        title: 'Aucune catégorie',
         tasks: [{
+          id: 'no-task',
           name: 'Aucune tâche disponible',
           time: '0 min',
+          value: 0,
           completion: 0,
+          color: 'grey',
           icon: 'mdi-information-outline'
         }]
       }];
@@ -62,22 +71,28 @@ const fetchDetailedStats = async () => {
       const response = await statisticsService.getGroupStatistics(selectedGroup.value);
 
       // Transformation des données pour l'affichage
-      // Note: La structure exacte dépend de la réponse API
       const categories = [];
       Object.entries(response).forEach(([userId, userStats]) => {
         categories.push({
-          category: userStats.userName || `Utilisateur #${userId}`,
+          id: `user-${userId}`,
+          title: userStats.userName || `Utilisateur #${userId}`,
           tasks: [
             {
+              id: `tasks-${userId}`,
               name: 'Total tâches',
               time: `${userStats.totalTasks} tâches`,
+              value: userStats.totalTasks,
               completion: userStats.completionRate || 0,
+              color: 'purple',
               icon: 'mdi-clipboard-list-outline'
             },
             {
+              id: `time-${userId}`,
               name: 'Temps total',
               time: `${userStats.totalTimeInMinutes} min`,
+              value: userStats.totalTimeInMinutes,
               completion: 100,
+              color: 'blue',
               icon: 'mdi-clock-outline'
             }
           ]
@@ -134,6 +149,8 @@ watch(selectedGroup, () => {
 onMounted(() => {
   loadGroups();
   loadStats();
+  // Par défaut, ouvrir le premier panneau
+  expandedPanels.value = [0];
 });
 </script>
 
@@ -198,35 +215,58 @@ onMounted(() => {
       <!-- Affichage des statistiques -->
       <div v-else class="mt-4">
         <template v-if="taskStats && taskStats.length > 0">
-          <div v-for="(category, index) in taskStats" :key="index" class="mb-4">
-            <div class="text-subtitle-1 mb-2">{{ category.category }}</div>
+          <!-- Utilisation de v-expansion-panels pour organiser les statistiques comme une feuille de temps -->
+          <v-expansion-panels v-model="expandedPanels" multiple>
+            <v-expansion-panel
+              v-for="(category, index) in taskStats"
+              :key="category.id || index"
+              :value="index"
+              bg-color="#1a237e"
+            >
+              <v-expansion-panel-title>
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2">mdi-folder-outline</v-icon>
+                  <span>{{ category.title }}</span>
+                  <v-chip class="ml-2" size="small" color="primary">
+                    {{ category.tasks.length }} tâches
+                  </v-chip>
+                </div>
+              </v-expansion-panel-title>
 
-            <div v-for="(task, taskIndex) in category.tasks" :key="taskIndex" class="mb-3">
-              <div class="d-flex align-center mb-1">
-                <v-icon size="small" class="mr-2">{{ task.icon }}</v-icon>
-                <span>{{ task.name }}</span>
-                <v-spacer></v-spacer>
-                <span>{{ task.time }}</span>
-              </div>
+              <v-expansion-panel-text>
+                <v-list bg-color="transparent">
+                  <v-list-item
+                    v-for="(task, taskIndex) in category.tasks"
+                    :key="task.id || taskIndex"
+                    class="mb-3"
+                  >
+                    <template v-slot:prepend>
+                      <v-icon size="small" class="mr-2">{{ task.icon }}</v-icon>
+                    </template>
 
-              <v-progress-linear
-                :model-value="task.completion"
-                height="10"
-                rounded
-                :color="task.completion >= 100 ? 'green' : 'purple'"
-              >
-                <template #default>
-                  <span class="text-caption">{{ Math.round(task.completion) }}%</span>
-                </template>
-              </v-progress-linear>
+                    <v-list-item-title>{{ task.name }}</v-list-item-title>
 
-              <div class="d-flex justify-end mt-1">
-                <v-btn size="x-small" variant="text" color="purple-lighten-3">
-                  Détail
-                </v-btn>
-              </div>
-            </div>
-          </div>
+                    <template v-slot:append>
+                      <span>{{ task.time }}</span>
+                    </template>
+
+                    <v-list-item-subtitle class="mt-2">
+                      <v-progress-linear
+                        :model-value="task.completion"
+                        height="10"
+                        rounded
+                        :color="task.color"
+                      >
+                        <template #default>
+                          <span class="text-caption">{{ Math.round(task.completion) }}%</span>
+                        </template>
+                      </v-progress-linear>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
         </template>
 
         <template v-else>
@@ -247,5 +287,20 @@ onMounted(() => {
 
 .tabs-container {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+  padding: 0;
+}
+
+.task-list-item {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.task-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 </style>

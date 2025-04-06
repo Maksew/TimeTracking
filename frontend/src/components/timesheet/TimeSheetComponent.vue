@@ -17,7 +17,8 @@ const userGroups = ref([]);
 const selectedGroup = ref(null);
 
 // Organisation hiérarchique
-const expandedTimeSheets = ref({}); // Pour savoir quelles feuilles sont dépliées
+const expandedTimeSheets = ref({});
+const expandedPanels = ref([]);
 
 // État du chronomètre
 const timerRunning = ref(false);
@@ -25,12 +26,14 @@ const timerSeconds = ref(0);
 const timerInterval = ref(null);
 const selectedTimeSheet = ref(null);
 const selectedTask = ref(null);
-const autoChainTasks = ref(false); // Option d'enchaînement automatique
+const autoChainTasks = ref(false);
 
 // Transforme les groupes pour l'affichage dans le select
 const groupOptions = computed(() => {
+  // Ajouter l'option "Personnel" en plus des groupes réels
   return [
     { title: 'Tous', value: null },
+    { title: 'Personnel', value: 'personnel' },
     ...userGroups.value.map(group => ({
       title: group.name,
       value: group.id
@@ -59,14 +62,39 @@ const loadTimeSheets = async () => {
       groupService.getUserGroups()
     ]);
 
-    timeSheets.value = sheets;
     userGroups.value = groups;
 
-    // Par défaut, sélectionner "Tous" (null)
-    selectedGroup.value = null;
+    // Traiter les feuilles de temps pour s'assurer que les propriétés nécessaires sont présentes
+    timeSheets.value = sheets.map(sheet => {
+      // Si pas de titre, utiliser la date formatée
+      if (!sheet.title) {
+        sheet.title = `Feuille du ${new Date(sheet.entryDate).toLocaleDateString()}`;
+      }
 
-    // Par défaut, première feuille de temps non vide
-    if (sheets.length > 0) {
+      // S'assurer que les tâches ont les propriétés nécessaires
+      if (sheet.timeSheetTasks) {
+        sheet.timeSheetTasks = sheet.timeSheetTasks.map(task => {
+          // Assurer que chaque tâche a un nom (depuis l'objet task.task si possible)
+          if (task.task && task.task.name) {
+            task.name = task.task.name;
+          } else if (!task.name) {
+            task.name = `Tâche non nommée`;
+          }
+
+          return task;
+        });
+      }
+
+      return sheet;
+    });
+
+    // Par défaut, sélectionner "Tous" (null)
+    if (!selectedGroup.value) {
+      selectedGroup.value = null;
+    }
+
+    // Par défaut, ouvrir la première feuille de temps si aucune n'est sélectionnée
+    if (sheets.length > 0 && !selectedTimeSheet.value) {
       setSelectedTimeSheet(sheets[0]);
     }
   } catch (err) {
@@ -79,13 +107,20 @@ const loadTimeSheets = async () => {
 
 // Filtre les feuilles de temps par groupe
 const filteredTimeSheets = computed(() => {
-  if (!selectedGroup.value) {
+  if (selectedGroup.value === 'personnel') {
+    // Afficher uniquement les feuilles personnelles (non partagées)
+    return timeSheets.value.filter(sheet =>
+      !sheet.sharedWithGroups || sheet.sharedWithGroups.length === 0
+    );
+  } else if (!selectedGroup.value) {
+    // Afficher toutes les feuilles
     return timeSheets.value;
+  } else {
+    // Filtrer par groupe spécifique
+    return timeSheets.value.filter(sheet =>
+      sheet.sharedWithGroups?.some(g => g.groupId === selectedGroup.value)
+    );
   }
-
-  return timeSheets.value.filter(sheet =>
-    sheet.sharedWithGroups?.some(g => g.groupId === selectedGroup.value)
-  );
 });
 
 // Sélectionne une feuille de temps et déploie ses tâches
@@ -101,20 +136,21 @@ const setSelectedTimeSheet = (timeSheet) => {
   }
 };
 
-// Sélectionne une tâche pour chronométrage
+// Sélectionne une tâche pour chronométrage (ne marque pas comme complétée)
 const selectTask = (timeSheet, task) => {
-  // Si timer en cours, demander confirmation avant de changer
+  // Si un timer est en cours pour une autre tâche, demander confirmation
   if (timerRunning.value && selectedTask.value &&
-    (selectedTask.value.id !== task.id || selectedTimeSheet.value?.id !== timeSheet.id)) {
+    (selectedTask.value.taskId !== task.taskId || selectedTimeSheet.value?.id !== timeSheet.id)) {
     const confirm = window.confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et passer à cette tâche?");
     if (!confirm) return;
     stopTimer();
   }
 
+  // Sélectionner la tâche (sans changer son statut)
   selectedTimeSheet.value = timeSheet;
   selectedTask.value = task;
 
-  // Mettre à jour le message de statut
+  // Feedback visuel
   statusMessage.value = `Tâche sélectionnée: ${task.name}`;
   setTimeout(() => {
     if (statusMessage.value === `Tâche sélectionnée: ${task.name}`) {
@@ -180,17 +216,29 @@ const stopTimer = async () => {
 
 // Sauvegarde le temps passé sur une tâche
 const saveTaskTime = async (task, additionalMinutes) => {
-  if (!task || !task.id || !selectedTimeSheet.value?.id) return;
+  if (!task || !task.taskId || !selectedTimeSheet.value?.id) return;
 
   // Calculer la nouvelle durée totale
   const newDuration = (task.duration || 0) + additionalMinutes;
 
   // Mettre à jour sur le serveur
-  await timeSheetService.updateTaskDuration(selectedTimeSheet.value.id, task.id, newDuration);
+  await timeSheetService.updateTaskDuration(selectedTimeSheet.value.id, task.taskId, newDuration);
 
-  // Mettre à jour localement
+  // Mettre à jour localement la durée sans changer le statut completed
   task.duration = newDuration;
-  task.completed = true; // Marquer comme effectuée une fois du temps enregistré
+
+  // Recharger les données pour s'assurer que tout est à jour
+  await loadTimeSheets();
+};
+
+// Marque explicitement une tâche comme complétée ou non
+const toggleTaskCompleted = async (task, completed) => {
+  // Ce clic est indépendant de la sélection de tâche pour chronométrage
+  task.completed = completed;
+
+  // On pourrait avoir une API dédiée pour mettre à jour le statut, si elle existe
+  // Pour l'instant, on simule localement ce comportement
+  console.log(`Tâche "${task.name}" marquée comme ${completed ? 'complétée' : 'non complétée'}`);
 };
 
 // Passe à la tâche suivante non complétée dans la feuille de temps actuelle
@@ -201,43 +249,17 @@ const moveToNextTask = () => {
   if (tasks.length === 0) return;
 
   // Trouver l'index de la tâche actuelle
-  const currentIndex = tasks.findIndex(t => t.taskId === selectedTask.value?.id);
+  const currentIndex = tasks.findIndex(t => t.taskId === selectedTask.value?.taskId);
 
-  // Trouver la prochaine tâche non complétée
-  let nextTaskIndex = -1;
-  for (let i = currentIndex + 1; i < tasks.length; i++) {
-    if (!tasks[i].completed) {
-      nextTaskIndex = i;
-      break;
-    }
-  }
+  // Trouver la prochaine tâche
+  let nextTaskIndex = (currentIndex + 1) % tasks.length;
 
-  // Si aucune tâche suivante non complétée, chercher depuis le début
-  if (nextTaskIndex === -1 && currentIndex > 0) {
-    for (let i = 0; i < currentIndex; i++) {
-      if (!tasks[i].completed) {
-        nextTaskIndex = i;
-        break;
-      }
-    }
-  }
+  // Sélectionner la tâche suivante
+  selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
 
-  // S'il y a une tâche suivante, la sélectionner
-  if (nextTaskIndex !== -1) {
-    selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
-    // Message discret
-    statusMessage.value = `Passé à la tâche: ${tasks[nextTaskIndex].name}`;
-    setTimeout(() => { statusMessage.value = ''; }, 2000);
-  } else {
-    // Toutes les tâches sont complétées
-    statusMessage.value = 'Toutes les tâches sont terminées';
-    setTimeout(() => { statusMessage.value = ''; }, 2000);
-  }
-};
-
-// Basculer l'expansion d'une feuille de temps
-const toggleExpand = (timeSheetId) => {
-  expandedTimeSheets.value[timeSheetId] = !expandedTimeSheets.value[timeSheetId];
+  // Message discret
+  statusMessage.value = `Passé à la tâche: ${tasks[nextTaskIndex].name}`;
+  setTimeout(() => { statusMessage.value = ''; }, 2000);
 };
 
 // Formatage du temps (minutes -> HH:MM)
@@ -391,7 +413,7 @@ watch(selectedGroup, () => {
                 <v-expansion-panel-title>
                   <div class="d-flex align-center">
                     <v-icon :icon="timeSheet.icon || 'mdi-file-document'" class="mr-2"></v-icon>
-                    <span>{{ timeSheet.title || `Feuille du ${new Date(timeSheet.entryDate).toLocaleDateString()}` }}</span>
+                    <span>{{ timeSheet.title }}</span>
                     <v-chip class="ml-2" size="small" color="primary">
                       {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
                     </v-chip>
@@ -404,21 +426,26 @@ watch(selectedGroup, () => {
                       v-for="task in timeSheet.timeSheetTasks"
                       :key="task.taskId"
                       :class="{
-                        'completed-task': task.completed,
-                        'selected-task': selectedTask && selectedTask.id === task.taskId && selectedTimeSheet.id === timeSheet.id
+                        'selected-task': selectedTask && selectedTask.taskId === task.taskId && selectedTimeSheet.id === timeSheet.id
                       }"
                       @click="selectTask(timeSheet, task)"
                     >
                       <template v-slot:prepend>
+                        <!-- La case à cocher contrôle seulement l'apparence visuelle,
+                             mais n'affecte pas la sélection de la tâche pour le timer -->
                         <v-checkbox-btn
-                          v-model="task.completed"
+                          :model-value="task.completed"
                           color="white"
                           hide-details
-                          @click.stop
+                          @click.stop="toggleTaskCompleted(task, !task.completed)"
                         ></v-checkbox-btn>
                       </template>
 
-                      <v-list-item-title>{{ task.task?.name || `Tâche non nommée` }}</v-list-item-title>
+                      <v-list-item-title
+                        :class="{ 'text-decoration-line-through': task.completed }"
+                      >
+                        {{ task.name }}
+                      </v-list-item-title>
 
                       <template v-slot:append>
                         <span>{{ formatTime(task.duration || 0) }}</span>
@@ -461,11 +488,6 @@ watch(selectedGroup, () => {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-}
-
-.completed-task {
-  opacity: 0.7;
-  text-decoration: line-through;
 }
 
 .selected-task {

@@ -25,6 +25,9 @@ public class TimeSheet {
     @Column(name = "icon", length = 50)
     private String icon;
 
+    @Column(name = "title", length = 100)
+    private String title;
+
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     @JsonBackReference("user-timesheets")
