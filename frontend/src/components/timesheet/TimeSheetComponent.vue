@@ -1,31 +1,34 @@
 <script setup>
-import { ref, watch, onMounted, computed, onUnmounted } from 'vue';
+import { ref, watch, onMounted, computed, onUnmounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
 import groupService from '@/services/groupService';
 
-// États
-const selectedGroup = ref(null);
-const currentTime = ref('00:00:00');
-const loading = ref(true);
-const error = ref(null);
-const successMessage = ref('');
-
-// Données
-const timeSheets = ref([]);
-const timeSheetTasks = ref([]);
-const userGroups = ref([]);
 const authStore = useAuthStore();
 
-// États pour le chronomètre
-const selectedTask = ref(null);
+// États
+const loading = ref(true);
+const error = ref(null);
+const statusMessage = ref('');
+
+// Données principales
+const timeSheets = ref([]);
+const userGroups = ref([]);
+const selectedGroup = ref(null);
+
+// Organisation hiérarchique
+const expandedTimeSheets = ref({}); // Pour savoir quelles feuilles sont dépliées
+
+// État du chronomètre
 const timerRunning = ref(false);
 const timerSeconds = ref(0);
 const timerInterval = ref(null);
-const activeTimeSheetId = ref(null);
+const selectedTimeSheet = ref(null);
+const selectedTask = ref(null);
+const autoChainTasks = ref(false); // Option d'enchaînement automatique
 
 // Transforme les groupes pour l'affichage dans le select
-const taskGroups = computed(() => {
+const groupOptions = computed(() => {
   return [
     { title: 'Tous', value: null },
     ...userGroups.value.map(group => ({
@@ -35,32 +38,20 @@ const taskGroups = computed(() => {
   ];
 });
 
-// Calcule le pourcentage de complétion
-const completion = computed(() => {
-  if (!timeSheetTasks.value.length) return 0;
-
-  const completed = timeSheetTasks.value.filter(task => task.completed).length;
-  return Math.round((completed / timeSheetTasks.value.length) * 100);
-});
-
-// Format la durée totale
-const formatTotalTime = () => {
-  // Calcule le temps total à partir des timeSheetTasks
-  const totalMinutes = timeSheetTasks.value.reduce((total, task) => {
-    return total + (task.duration || 0);
-  }, 0);
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const seconds = 0;
+// Format le temps du chronomètre (en secondes) pour l'affichage
+const formattedTimerDisplay = computed(() => {
+  const hours = Math.floor(timerSeconds.value / 3600);
+  const minutes = Math.floor((timerSeconds.value % 3600) / 60);
+  const seconds = timerSeconds.value % 60;
 
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
+});
 
 // Charge les feuilles de temps de l'utilisateur
 const loadTimeSheets = async () => {
   try {
     loading.value = true;
+    error.value = null;
 
     // Récupérer les feuilles de temps et les groupes en parallèle
     const [sheets, groups] = await Promise.all([
@@ -71,11 +62,13 @@ const loadTimeSheets = async () => {
     timeSheets.value = sheets;
     userGroups.value = groups;
 
-    // Filtrer par groupe si nécessaire
-    filterTimeSheetsByGroup();
+    // Par défaut, sélectionner "Tous" (null)
+    selectedGroup.value = null;
 
-    // Mettre à jour le temps total
-    currentTime.value = formatTotalTime();
+    // Par défaut, première feuille de temps non vide
+    if (sheets.length > 0) {
+      setSelectedTimeSheet(sheets[0]);
+    }
   } catch (err) {
     console.error('Erreur lors du chargement des feuilles de temps:', err);
     error.value = 'Impossible de charger les feuilles de temps';
@@ -85,67 +78,61 @@ const loadTimeSheets = async () => {
 };
 
 // Filtre les feuilles de temps par groupe
-const filterTimeSheetsByGroup = () => {
-  // Si aucun groupe n'est sélectionné, prendre la première feuille de temps
-  let filteredSheets = [...timeSheets.value];
-
-  if (selectedGroup.value) {
-    // Filtrer les feuilles de temps partagées avec ce groupe
-    filteredSheets = filteredSheets.filter(sheet =>
-      sheet.sharedWithGroups?.some(g => g.groupId === selectedGroup.value)
-    );
+const filteredTimeSheets = computed(() => {
+  if (!selectedGroup.value) {
+    return timeSheets.value;
   }
 
-  // S'il y a des feuilles de temps après filtrage, prendre la première
-  if (filteredSheets.length > 0) {
-    // Convertir les tâches de la feuille de temps pour l'affichage
-    const firstSheet = filteredSheets[0];
-    activeTimeSheetId.value = firstSheet.id;
+  return timeSheets.value.filter(sheet =>
+    sheet.sharedWithGroups?.some(g => g.groupId === selectedGroup.value)
+  );
+});
 
-    // Format requis pour l'affichage
-    timeSheetTasks.value = firstSheet.timeSheetTasks.map(tst => ({
-      id: tst.taskId,
-      timeSheetId: firstSheet.id,
-      name: tst.task?.name || `Tâche #${tst.taskId}`,
-      duration: tst.duration || 0,
-      time: formatTime(tst.duration || 0),
-      completed: tst.duration > 0 // Une tâche avec durée > 0 est considérée comme complétée
-    }));
-  } else {
-    timeSheetTasks.value = [];
-    activeTimeSheetId.value = null;
+// Sélectionne une feuille de temps et déploie ses tâches
+const setSelectedTimeSheet = (timeSheet) => {
+  if (!timeSheet) return;
+
+  selectedTimeSheet.value = timeSheet;
+
+  // Trouver l'index de la feuille dans les feuilles filtrées et l'ouvrir
+  const index = filteredTimeSheets.value.findIndex(ts => ts.id === timeSheet.id);
+  if (index !== -1 && !expandedPanels.value.includes(index)) {
+    expandedPanels.value.push(index);
   }
 };
 
-// Formate le temps en minutes vers "HH:MM:SS" ou "XX min"
-const formatTime = (minutes) => {
-  if (!minutes) return '00:00';
-
-  if (minutes < 60) {
-    return `${minutes} min`;
+// Sélectionne une tâche pour chronométrage
+const selectTask = (timeSheet, task) => {
+  // Si timer en cours, demander confirmation avant de changer
+  if (timerRunning.value && selectedTask.value &&
+    (selectedTask.value.id !== task.id || selectedTimeSheet.value?.id !== timeSheet.id)) {
+    const confirm = window.confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et passer à cette tâche?");
+    if (!confirm) return;
+    stopTimer();
   }
 
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
-// Format le temps du chronomètre (en secondes) pour l'affichage
-const formatTimerDisplay = () => {
-  const hours = Math.floor(timerSeconds.value / 3600);
-  const minutes = Math.floor((timerSeconds.value % 3600) / 60);
-  const seconds = timerSeconds.value % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
-
-// Démarre le chronomètre pour une tâche spécifique
-const startTimer = (task) => {
-  if (timerRunning.value) {
-    stopTimer(); // Arrêter tout timer en cours
-  }
-
+  selectedTimeSheet.value = timeSheet;
   selectedTask.value = task;
+
+  // Mettre à jour le message de statut
+  statusMessage.value = `Tâche sélectionnée: ${task.name}`;
+  setTimeout(() => {
+    if (statusMessage.value === `Tâche sélectionnée: ${task.name}`) {
+      statusMessage.value = '';
+    }
+  }, 2000);
+};
+
+// Démarre le chronomètre pour la tâche sélectionnée
+const startTimer = () => {
+  if (!selectedTask.value) {
+    statusMessage.value = 'Veuillez sélectionner une tâche';
+    setTimeout(() => { statusMessage.value = ''; }, 2000);
+    return;
+  }
+
+  if (timerRunning.value) return;
+
   timerRunning.value = true;
   timerSeconds.value = 0;
 
@@ -153,59 +140,113 @@ const startTimer = (task) => {
     timerSeconds.value++;
   }, 1000);
 
-  successMessage.value = `Chronométrage démarré pour "${task.name}"`;
-  setTimeout(() => { successMessage.value = ''; }, 3000);
+  // Message discret
+  statusMessage.value = `Chronométrage démarré: ${selectedTask.value.name}`;
+  setTimeout(() => { statusMessage.value = ''; }, 2000);
 };
 
 // Arrête le chronomètre et enregistre le temps passé
 const stopTimer = async () => {
-  if (!timerRunning.value || !selectedTask.value) return;
+  if (!timerRunning.value || !selectedTask.value || !selectedTimeSheet.value) return;
 
   clearInterval(timerInterval.value);
+  timerInterval.value = null;
 
   // Calculer les minutes passées et sauvegarder
   const minutesSpent = Math.round(timerSeconds.value / 60);
   if (minutesSpent > 0) {
-    await saveTaskTime(selectedTask.value, minutesSpent);
+    try {
+      await saveTaskTime(selectedTask.value, minutesSpent);
+
+      // Message discret
+      statusMessage.value = `${minutesSpent} minutes ajoutées à "${selectedTask.value.name}"`;
+      setTimeout(() => { statusMessage.value = ''; }, 2000);
+
+      // Si mode enchaînement automatique activé
+      if (autoChainTasks.value) {
+        await nextTick(); // Attendre la mise à jour du DOM
+        moveToNextTask();
+      }
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde du temps:', err);
+      statusMessage.value = 'Erreur lors de la sauvegarde';
+      setTimeout(() => { statusMessage.value = ''; }, 2000);
+    }
   }
 
   timerRunning.value = false;
   timerSeconds.value = 0;
-
-  successMessage.value = `Chronométrage arrêté pour "${selectedTask.value.name}"`;
-  setTimeout(() => { successMessage.value = ''; }, 3000);
 };
 
 // Sauvegarde le temps passé sur une tâche
 const saveTaskTime = async (task, additionalMinutes) => {
-  try {
-    if (!task || !task.id || !activeTimeSheetId.value) return;
+  if (!task || !task.id || !selectedTimeSheet.value?.id) return;
 
-    // Calculer la nouvelle durée totale
-    const newDuration = (task.duration || 0) + additionalMinutes;
+  // Calculer la nouvelle durée totale
+  const newDuration = (task.duration || 0) + additionalMinutes;
 
-    // Mettre à jour sur le serveur
-    await timeSheetService.updateTaskDuration(activeTimeSheetId.value, task.id, newDuration);
+  // Mettre à jour sur le serveur
+  await timeSheetService.updateTaskDuration(selectedTimeSheet.value.id, task.id, newDuration);
 
-    // Mettre à jour localement
-    const updatedTask = timeSheetTasks.value.find(t => t.id === task.id);
-    if (updatedTask) {
-      updatedTask.duration = newDuration;
-      updatedTask.time = formatTime(newDuration);
-      updatedTask.completed = true;
+  // Mettre à jour localement
+  task.duration = newDuration;
+  task.completed = true; // Marquer comme effectuée une fois du temps enregistré
+};
+
+// Passe à la tâche suivante non complétée dans la feuille de temps actuelle
+const moveToNextTask = () => {
+  if (!selectedTimeSheet.value) return;
+
+  const tasks = selectedTimeSheet.value.timeSheetTasks || [];
+  if (tasks.length === 0) return;
+
+  // Trouver l'index de la tâche actuelle
+  const currentIndex = tasks.findIndex(t => t.taskId === selectedTask.value?.id);
+
+  // Trouver la prochaine tâche non complétée
+  let nextTaskIndex = -1;
+  for (let i = currentIndex + 1; i < tasks.length; i++) {
+    if (!tasks[i].completed) {
+      nextTaskIndex = i;
+      break;
     }
+  }
 
-    // Mettre à jour le temps total affiché
-    currentTime.value = formatTotalTime();
+  // Si aucune tâche suivante non complétée, chercher depuis le début
+  if (nextTaskIndex === -1 && currentIndex > 0) {
+    for (let i = 0; i < currentIndex; i++) {
+      if (!tasks[i].completed) {
+        nextTaskIndex = i;
+        break;
+      }
+    }
+  }
 
-  } catch (err) {
-    console.error('Erreur lors de l\'enregistrement du temps:', err);
-    error.value = 'Impossible d\'enregistrer le temps passé';
+  // S'il y a une tâche suivante, la sélectionner
+  if (nextTaskIndex !== -1) {
+    selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
+    // Message discret
+    statusMessage.value = `Passé à la tâche: ${tasks[nextTaskIndex].name}`;
+    setTimeout(() => { statusMessage.value = ''; }, 2000);
+  } else {
+    // Toutes les tâches sont complétées
+    statusMessage.value = 'Toutes les tâches sont terminées';
+    setTimeout(() => { statusMessage.value = ''; }, 2000);
   }
 };
 
-// Regarder les changements de groupe pour filtrer les feuilles de temps
-watch(selectedGroup, filterTimeSheetsByGroup);
+// Basculer l'expansion d'une feuille de temps
+const toggleExpand = (timeSheetId) => {
+  expandedTimeSheets.value[timeSheetId] = !expandedTimeSheets.value[timeSheetId];
+};
+
+// Formatage du temps (minutes -> HH:MM)
+const formatTime = (minutes) => {
+  if (!minutes) return '00:00';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
 
 // Nettoyer l'intervalle du chronomètre lors du démontage du composant
 onUnmounted(() => {
@@ -217,6 +258,21 @@ onUnmounted(() => {
 // Initialisation
 onMounted(() => {
   loadTimeSheets();
+});
+
+// Observer les changements de groupe pour filtrer les feuilles de temps
+watch(selectedGroup, () => {
+  // Si le groupe sélectionné change et qu'il n'y a plus de feuilles correspondantes
+  if (filteredTimeSheets.value.length === 0) {
+    selectedTimeSheet.value = null;
+    selectedTask.value = null;
+  }
+  // Si le groupe change et la feuille sélectionnée n'est plus dans le filtre
+  else if (selectedTimeSheet.value &&
+    !filteredTimeSheets.value.some(ts => ts.id === selectedTimeSheet.value.id)) {
+    // Sélectionner la première feuille du nouveau filtre
+    setSelectedTimeSheet(filteredTimeSheets.value[0]);
+  }
 });
 </script>
 
@@ -244,9 +300,9 @@ onMounted(() => {
       <v-alert type="error" text dense>{{ error }}</v-alert>
     </div>
 
-    <!-- Message de succès -->
-    <div v-if="successMessage" class="pa-2">
-      <v-alert type="success" text dense>{{ successMessage }}</v-alert>
+    <!-- Message de statut discret -->
+    <div v-if="statusMessage" class="status-message">
+      {{ statusMessage }}
     </div>
 
     <!-- Contenu principal -->
@@ -254,7 +310,7 @@ onMounted(() => {
       <!-- Chronomètre -->
       <div class="d-flex justify-center align-center py-4">
         <div class="text-h3 font-weight-bold timer">
-          {{ timerRunning ? formatTimerDisplay() : currentTime }}
+          {{ formattedTimerDisplay }}
         </div>
 
         <template v-if="!timerRunning">
@@ -263,7 +319,7 @@ onMounted(() => {
             class="ml-4 play-btn"
             color="green"
             :disabled="!selectedTask"
-            @click="startTimer(selectedTask)"
+            @click="startTimer"
           >
             <v-icon>mdi-play</v-icon>
             <v-tooltip activator="parent" location="bottom">Démarrer</v-tooltip>
@@ -283,11 +339,35 @@ onMounted(() => {
         </template>
       </div>
 
+      <!-- Information sur tâche sélectionnée -->
+      <div v-if="selectedTask" class="selected-task-info pa-2 mb-3">
+        <div class="d-flex align-center">
+          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2"></v-icon>
+          <span class="font-weight-medium">{{ selectedTimeSheet?.title || "Feuille" }}</span>
+          <v-icon class="mx-2">mdi-chevron-right</v-icon>
+          <span class="selected-task-name">{{ selectedTask.name }}</span>
+        </div>
+      </div>
+
       <v-card-text>
+        <!-- Option d'enchaînement automatique -->
+        <div class="auto-chain-option mb-3">
+          <v-checkbox
+            v-model="autoChainTasks"
+            label="Enchaîner automatiquement les tâches"
+            color="white"
+            hide-details
+          >
+            <template v-slot:label>
+              <div @click.stop>Enchaîner automatiquement les tâches</div>
+            </template>
+          </v-checkbox>
+        </div>
+
         <!-- Sélecteur de groupe -->
         <v-select
           v-model="selectedGroup"
-          :items="taskGroups"
+          :items="groupOptions"
           item-title="title"
           item-value="value"
           variant="outlined"
@@ -298,33 +378,36 @@ onMounted(() => {
           class="group-select mb-3"
         ></v-select>
 
-        <!-- Nombre de tâches incomplètes -->
-        <div v-if="timeSheets.length > 0 && timeSheetTasks.length > 0" class="task-counter mb-2">
-          Personnel - {{ timeSheetTasks.filter(t => !t.completed).length }} tâches incomplètes
-        </div>
-
-        <!-- Liste des tâches -->
-        <div class="task-container">
-          <template v-if="timeSheets.length > 0 && timeSheetTasks.length > 0">
-            <v-expansion-panels>
+        <!-- Liste des feuilles de temps -->
+        <div class="timesheet-container">
+          <template v-if="filteredTimeSheets.length > 0">
+            <v-expansion-panels v-model="expandedPanels" multiple>
               <v-expansion-panel
+                v-for="(timeSheet, index) in filteredTimeSheets"
+                :key="timeSheet.id"
+                :value="index"
                 bg-color="#1a237e"
               >
                 <v-expansion-panel-title>
-                  <v-icon size="small" class="mr-2">mdi-home</v-icon>
-                  Tâches disponibles
+                  <div class="d-flex align-center">
+                    <v-icon :icon="timeSheet.icon || 'mdi-file-document'" class="mr-2"></v-icon>
+                    <span>{{ timeSheet.title || `Feuille du ${new Date(timeSheet.entryDate).toLocaleDateString()}` }}</span>
+                    <v-chip class="ml-2" size="small" color="primary">
+                      {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
+                    </v-chip>
+                  </div>
                 </v-expansion-panel-title>
 
                 <v-expansion-panel-text>
                   <v-list bg-color="transparent">
                     <v-list-item
-                      v-for="task in timeSheetTasks"
-                      :key="task.id"
+                      v-for="task in timeSheet.timeSheetTasks"
+                      :key="task.taskId"
                       :class="{
                         'completed-task': task.completed,
-                        'selected-task': selectedTask && selectedTask.id === task.id
+                        'selected-task': selectedTask && selectedTask.id === task.taskId && selectedTimeSheet.id === timeSheet.id
                       }"
-                      @click="selectedTask = task"
+                      @click="selectTask(timeSheet, task)"
                     >
                       <template v-slot:prepend>
                         <v-checkbox-btn
@@ -335,31 +418,16 @@ onMounted(() => {
                         ></v-checkbox-btn>
                       </template>
 
-                      <v-list-item-title>{{ task.name }}</v-list-item-title>
+                      <v-list-item-title>{{ task.task?.name || `Tâche non nommée` }}</v-list-item-title>
 
                       <template v-slot:append>
-                        <span>{{ task.time }}</span>
+                        <span>{{ formatTime(task.duration || 0) }}</span>
                       </template>
                     </v-list-item>
                   </v-list>
                 </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
-
-            <!-- Cercle de progression -->
-            <div class="d-flex align-center justify-center mt-6">
-              <div class="progress-circle-container">
-                <v-progress-circular
-                  :model-value="completion"
-                  :color="completion < 50 ? '#9c27b0' : '#e040fb'"
-                  size="120"
-                  width="8"
-                  class="progress-circle"
-                >
-                  <span class="percentage">{{ completion }}%</span>
-                </v-progress-circular>
-              </div>
-            </div>
           </template>
 
           <!-- Message si aucune feuille de temps n'est disponible -->
@@ -389,12 +457,7 @@ onMounted(() => {
   max-width: 180px;
 }
 
-.task-counter {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.task-container {
+.timesheet-container {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
@@ -402,6 +465,7 @@ onMounted(() => {
 
 .completed-task {
   opacity: 0.7;
+  text-decoration: line-through;
 }
 
 .selected-task {
@@ -437,18 +501,32 @@ onMounted(() => {
   background-color: rgba(244, 67, 54, 0.5);
 }
 
-.progress-circle-container {
-  position: relative;
-  margin: 16px 0;
+.selected-task-info {
+  background-color: rgba(156, 39, 176, 0.2);
+  border-left: 3px solid #e040fb;
+  padding: 8px 12px;
+  margin: 0 16px;
+  border-radius: 4px;
 }
 
-.progress-circle {
-  filter: drop-shadow(0 0 8px rgba(156, 39, 176, 0.4));
+.selected-task-name {
+  font-weight: 500;
 }
 
-.percentage {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
+.status-message {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  transition: opacity 0.3s;
+  max-width: 80%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 10;
 }
 </style>

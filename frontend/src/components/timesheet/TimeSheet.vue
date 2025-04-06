@@ -21,12 +21,16 @@
         </v-card-title>
 
         <template v-slot:append>
-          <v-badge v-if="unsavedChanges" color="warning" dot>
-            <v-btn icon @click="showSavePrompt = true">
-              <v-icon>mdi-content-save</v-icon>
-              <v-tooltip activator="parent" location="bottom">Enregistrer</v-tooltip>
-            </v-btn>
-          </v-badge>
+          <v-btn
+            color="primary"
+            icon
+            @click="submit"
+            :loading="isSubmitting"
+            :disabled="isSubmitting || tasks.every(task => !task.name.trim())"
+          >
+            <v-icon>mdi-content-save</v-icon>
+            <v-tooltip activator="parent" location="bottom">{{ isEditing ? 'Mettre à jour' : 'Créer' }}</v-tooltip>
+          </v-btn>
         </template>
       </v-card-item>
 
@@ -71,6 +75,58 @@
           </v-chip-group>
         </div>
 
+        <!-- Durée de validité -->
+        <div class="mb-4">
+          <label class="text-body-2 mb-2 d-block">Durée de validité</label>
+          <v-row>
+            <v-col cols="6">
+              <v-menu
+                v-model="startDateMenu"
+                :close-on-content-click="false"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-text-field
+                    v-model="formattedStartDate"
+                    label="Date de début"
+                    variant="outlined"
+                    prepend-inner-icon="mdi-calendar-start"
+                    bg-color="#1a237e"
+                    readonly
+                    v-bind="props"
+                  ></v-text-field>
+                </template>
+                <v-date-picker
+                  v-model="startDate"
+                  @update:model-value="startDateMenu = false"
+                ></v-date-picker>
+              </v-menu>
+            </v-col>
+            <v-col cols="6">
+              <v-menu
+                v-model="endDateMenu"
+                :close-on-content-click="false"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-text-field
+                    v-model="formattedEndDate"
+                    label="Date de fin"
+                    variant="outlined"
+                    prepend-inner-icon="mdi-calendar-end"
+                    bg-color="#1a237e"
+                    readonly
+                    v-bind="props"
+                  ></v-text-field>
+                </template>
+                <v-date-picker
+                  v-model="endDate"
+                  :min="startDate"
+                  @update:model-value="endDateMenu = false"
+                ></v-date-picker>
+              </v-menu>
+            </v-col>
+          </v-row>
+        </div>
+
         <!-- Tasks (Draggable) -->
         <div class="mb-4">
           <div class="d-flex align-center mb-2">
@@ -88,12 +144,6 @@
             </v-btn>
           </div>
 
-          <!-- Alerte explicative sur la durée -->
-          <v-alert type="info" variant="tonal" class="mb-3">
-            La <strong>durée</strong> indiquée représente l'<strong>objectif</strong> ou la <strong>périodicité</strong> de la tâche.
-            Le temps réellement passé sera mesuré avec le chronomètre sur le tableau de bord.
-          </v-alert>
-
           <v-card class="mb-4" color="#1A237E">
             <div ref="tasksContainer" class="pa-2">
               <div
@@ -108,8 +158,9 @@
 
                 <!-- Task Field -->
                 <v-text-field
-                  v-model="task.text"
+                  v-model="task.name"
                   :label="`Tâche #${index + 1}`"
+                  placeholder="Nom de la tâche..."
                   variant="outlined"
                   density="compact"
                   hide-details="auto"
@@ -117,25 +168,6 @@
                   style="background-color: rgba(255,255,255,0.05); color: #FFF;"
                   @change="unsavedChanges = true"
                 />
-
-                <!-- Task Duration avec tooltip explicatif -->
-                <v-tooltip location="top">
-                  <template v-slot:activator="{ props }">
-                    <div class="mr-2" v-bind="props">
-                      <v-text-field
-                        v-model="task.duration"
-                        label="Durée (min)"
-                        variant="outlined"
-                        density="compact"
-                        hide-details="auto"
-                        type="number"
-                        style="max-width: 110px; background-color: rgba(255,255,255,0.05); color: #FFF;"
-                        @change="unsavedChanges = true"
-                      />
-                    </div>
-                  </template>
-                  <span>Objectif ou périodicité, pas le temps réel</span>
-                </v-tooltip>
 
                 <!-- Remove Task -->
                 <v-btn icon color="error" size="small" @click="removeTask(index)">
@@ -150,108 +182,12 @@
           </v-card>
         </div>
 
-        <!-- Choose: Either "Fixer la date d'échéance" or "Jour / Heure / Minutes" -->
-        <div class="mb-4">
-          <label class="text-body-2 mb-2 d-block">Période</label>
-
-          <v-tabs v-model="modeTab" bg-color="#1A237E" align-tabs="center">
-            <v-tab value="date">
-              <v-icon start>mdi-calendar-end</v-icon>
-              Date d'échéance
-            </v-tab>
-            <v-tab value="dhm">
-              <v-icon start>mdi-clock-time-four</v-icon>
-              Durée manuelle
-            </v-tab>
-          </v-tabs>
-
-          <v-window v-model="modeTab" class="mt-4">
-            <!-- If "Fixer la date d'échéance" -->
-            <v-window-item value="date">
-              <v-card flat>
-                <div class="pa-4">
-                  <div v-if="selectedDate" class="mb-4">
-                    <v-chip color="primary" size="large" class="pa-4">
-                      <v-icon start>mdi-calendar-check</v-icon>
-                      Date d'échéance: {{ formatDate(selectedDate) }}
-                    </v-chip>
-                    <v-btn icon class="ml-2" color="error" variant="outlined" @click="selectedDate = null">
-                      <v-icon>mdi-close</v-icon>
-                    </v-btn>
-                  </div>
-
-                  <v-btn
-                    variant="outlined"
-                    color="primary"
-                    prepend-icon="mdi-calendar"
-                    @click="openDateDialog"
-                  >
-                    {{ selectedDate ? 'Modifier la date' : 'Fixer la date d\'échéance' }}
-                  </v-btn>
-                </div>
-              </v-card>
-            </v-window-item>
-
-            <!-- If "Jour / Heure / Minutes" -->
-            <v-window-item value="dhm">
-              <v-card flat>
-                <div class="pa-4">
-                  <v-row dense>
-                    <v-col cols="4">
-                      <v-text-field
-                        label="Jours"
-                        type="number"
-                        v-model="days"
-                        variant="outlined"
-                        min="0"
-                        hide-details="auto"
-                        style="background-color: rgba(255,255,255,0.1); color: #FFF;"
-                      />
-                    </v-col>
-                    <v-col cols="4">
-                      <v-text-field
-                        label="Heures"
-                        type="number"
-                        v-model="hours"
-                        variant="outlined"
-                        min="0"
-                        max="23"
-                        hide-details="auto"
-                        style="background-color: rgba(255,255,255,0.1); color: #FFF;"
-                      />
-                    </v-col>
-                    <v-col cols="4">
-                      <v-text-field
-                        label="Minutes"
-                        type="number"
-                        v-model="minutes"
-                        variant="outlined"
-                        min="0"
-                        max="59"
-                        hide-details="auto"
-                        style="background-color: rgba(255,255,255,0.1); color: #FFF;"
-                      />
-                    </v-col>
-                  </v-row>
-
-                  <div class="text-center mt-4">
-                    <v-chip color="success" size="large">
-                      <v-icon start>mdi-timer</v-icon>
-                      Durée totale: {{ calculateTotalTime() }}
-                    </v-chip>
-                  </div>
-                </div>
-              </v-card>
-            </v-window-item>
-          </v-window>
-        </div>
-
         <!-- Partage avec groupe (optionnel) -->
         <div v-if="userGroups.length > 0" class="mb-4">
           <label class="text-body-2 mb-2 d-block">Partager avec un groupe (optionnel)</label>
           <v-select
             v-model="selectedGroup"
-            :items="userGroups"
+            :items="[{name: 'Personnel', id: 'personnel'}, ...userGroups]"
             item-title="name"
             item-value="id"
             label="Sélectionner un groupe"
@@ -279,27 +215,6 @@
         </v-btn>
       </v-card-actions>
     </v-card>
-
-    <!-- Date Picker Dialog -->
-    <v-dialog v-model="dateDialog" persistent max-width="500">
-      <v-card style="background-color: #2C2C5E; color: #FFF; overflow: hidden;">
-        <v-card-title class="py-2">Choisissez la date d'échéance</v-card-title>
-        <v-card-text style="padding-top: 0;">
-          <v-date-picker
-            v-model="tempDate"
-            color="primary"
-            theme="dark"
-            landscape
-            show-current
-          />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn text color="grey" @click="cancelDate">Annuler</v-btn>
-          <v-btn text color="primary" @click="saveDate">Confirmer</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Prompt sauvegarde non enregistrée -->
     <v-dialog v-model="showSavePrompt" max-width="400">
@@ -350,19 +265,26 @@ const successMessage = ref('')
 // Informations du formulaire
 const titre = ref('')
 const selectedIcon = ref('mdi-file-document')
-const modeTab = ref('dhm') // 'date' or 'dhm'
 const tasks = ref([])
 const nextTaskId = ref(1)
 
-// Pour la date d'échéance
-const dateDialog = ref(false)
-const selectedDate = ref(null)
-const tempDate = ref(null)
+// Dates de validité
+const startDate = ref(new Date().toISOString().split('T')[0])
+const endDate = ref((() => {
+  const date = new Date()
+  date.setDate(date.getDate() + 14) // Par défaut, 2 semaines de validité
+  return date.toISOString().split('T')[0]
+})())
+const startDateMenu = ref(false)
+const endDateMenu = ref(false)
 
-// Pour la durée manuelle
-const days = ref(0)
-const hours = ref(0)
-const minutes = ref(0)
+const formattedStartDate = computed(() => {
+  return formatDate(startDate.value)
+})
+
+const formattedEndDate = computed(() => {
+  return formatDate(endDate.value)
+})
 
 // Partage de groupe
 const userGroups = ref([])
@@ -448,11 +370,19 @@ async function loadTemplate(id) {
     titre.value = template.title || ''
     selectedIcon.value = template.icon || 'mdi-file-document'
 
+    // Dates de validité
+    if (template.startDate) {
+      startDate.value = template.startDate
+    }
+    if (template.endDate) {
+      endDate.value = template.endDate
+    }
+
     // Charger les tâches
     if (template.timeSheetTasks && template.timeSheetTasks.length > 0) {
       tasks.value = template.timeSheetTasks.map(tst => ({
         id: nextTaskId.value++,
-        text: tst.task?.name || `Tâche ${tst.taskId}`,
+        name: tst.task?.name || `Tâche ${tst.taskId}`,
         taskId: tst.taskId,
         duration: tst.duration || 0
       }))
@@ -460,22 +390,12 @@ async function loadTemplate(id) {
       addTask() // Au moins une tâche vide
     }
 
-    // Date d'échéance ou durée
-    if (template.dueDate) {
-      selectedDate.value = template.dueDate
-      modeTab.value = 'date'
-    } else {
-      // Calculer jours/heures/minutes à partir de la durée totale
-      const totalMinutes = template.timeSheetTasks?.reduce((sum, tst) => sum + (tst.duration || 0), 0) || 0
-      days.value = Math.floor(totalMinutes / (60 * 24))
-      hours.value = Math.floor((totalMinutes % (60 * 24)) / 60)
-      minutes.value = totalMinutes % 60
-      modeTab.value = 'dhm'
-    }
-
     // Groupe associé
     if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
       selectedGroup.value = template.sharedWithGroups[0].groupId
+    } else {
+      // Si pas de groupe associé, utiliser le groupe Personnel par défaut
+      selectedGroup.value = personalGroupId.value
     }
 
     // Réinitialiser l'état des modifications
@@ -490,33 +410,24 @@ async function loadUserGroups() {
   try {
     const groups = await groupService.getUserGroups()
     userGroups.value = groups
+
+    // Chercher le groupe "Personnel" existant
+    const personalGroup = groups.find(g => g.name === "Personnel")
+    if (personalGroup) {
+      personalGroupId.value = personalGroup.id
+    }
   } catch (error) {
     console.error('Erreur lors du chargement des groupes:', error)
   }
 }
 
 function addTask() {
-  tasks.value.push({ id: nextTaskId.value++, text: '', duration: 30 })
+  tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }) // Toujours commencer à 0
   unsavedChanges.value = true
 }
 
 function removeTask(index) {
   tasks.value.splice(index, 1)
-  unsavedChanges.value = true
-}
-
-function openDateDialog() {
-  tempDate.value = selectedDate.value
-  dateDialog.value = true
-}
-
-function cancelDate() {
-  dateDialog.value = false
-}
-
-function saveDate() {
-  selectedDate.value = tempDate.value
-  dateDialog.value = false
   unsavedChanges.value = true
 }
 
@@ -534,23 +445,6 @@ function goBackWithoutSaving() {
   router.back()
 }
 
-function calculateTotalTime() {
-  const totalMinutes = parseInt(days.value || 0) * 24 * 60 +
-    parseInt(hours.value || 0) * 60 +
-    parseInt(minutes.value || 0)
-
-  const displayDays = Math.floor(totalMinutes / (60 * 24))
-  const displayHours = Math.floor((totalMinutes % (60 * 24)) / 60)
-  const displayMinutes = totalMinutes % 60
-
-  let result = ''
-  if (displayDays > 0) result += `${displayDays}j `
-  if (displayHours > 0) result += `${displayHours}h `
-  result += `${displayMinutes}min`
-
-  return result.trim()
-}
-
 async function submit() {
   // Valider le formulaire
   if (!titre.value.trim()) {
@@ -558,7 +452,7 @@ async function submit() {
     return
   }
 
-  if (tasks.value.length === 0 || tasks.value.every(task => !task.text.trim())) {
+  if (tasks.value.length === 0 || tasks.value.every(task => !task.name.trim())) {
     errorMessage.value = "Veuillez ajouter au moins une tâche."
     return
   }
@@ -572,7 +466,8 @@ async function submit() {
       entryDate: new Date().toISOString().split('T')[0],
       title: titre.value,
       icon: selectedIcon.value,
-      dueDate: modeTab.value === 'date' ? selectedDate.value : null
+      startDate: startDate.value,
+      endDate: endDate.value
     }
 
     // Créer ou mettre à jour la feuille de temps
@@ -586,34 +481,24 @@ async function submit() {
 
     // Ajouter ou mettre à jour les tâches
     for (const task of tasks.value) {
-      if (task.text.trim()) {
+      if (task.name.trim()) {
         // Créer la tâche si nécessaire
         let taskId = task.taskId
         if (!taskId) {
           const taskData = await taskService.createTask({
-            name: task.text,
+            name: task.name,
             repetition: 'NONE'
           })
           taskId = taskData.id
         }
 
-        // Calculer la durée en minutes
-        let duration = parseInt(task.duration || 0)
-        if (modeTab.value === 'dhm' && !duration) {
-          // Répartir la durée totale entre les tâches
-          const totalTaskMinutes = parseInt(days.value || 0) * 24 * 60 +
-            parseInt(hours.value || 0) * 60 +
-            parseInt(minutes.value || 0)
-          duration = Math.floor(totalTaskMinutes / tasks.value.filter(t => t.text.trim()).length)
-        }
-
-        // Ajouter la tâche à la feuille de temps
-        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, duration)
+        // Ajouter la tâche à la feuille de temps avec durée 0
+        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0)
       }
     }
 
-    // Partager avec le groupe si sélectionné
-    if (selectedGroup.value) {
+    // Partager avec le groupe si sélectionné (et que ce n'est pas le groupe Personnel virtuel)
+    if (selectedGroup.value && selectedGroup.value !== 'personnel') {
       await timeSheetService.shareTimeSheetWithGroup(timeSheet.id, selectedGroup.value, 'READ')
     }
 
@@ -633,18 +518,18 @@ async function submit() {
   }
 }
 
-function formatDate(date) {
-  if (!date) return ''
-  const d = new Date(date)
-  return d.toLocaleDateString('fr-FR', {
+function formatDate(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
-  })
+  });
 }
 
 // Observer les changements pour détecter les modifications non enregistrées
-watch([titre, selectedIcon, tasks, selectedDate, days, hours, minutes, selectedGroup], () => {
+watch([titre, selectedIcon, tasks, selectedGroup, startDate, endDate], () => {
   unsavedChanges.value = true
 })
 </script>
