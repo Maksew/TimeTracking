@@ -50,9 +50,12 @@ const logout = () => {
 
     <div v-if="isAuthenticated" class="d-flex align-center">
       <span class="user-name mr-2">{{ user && user.pseudo ? user.pseudo : 'TEST' }}</span>
-      <v-avatar color="#7986cb" size="36" class="mr-3">
+      <v-avatar color="#7986cb" size="36" class="mr-3" @click="router.push('/profile')" style="cursor: pointer;">
         <span class="text-h6" v-if="user && user.pseudo">{{ user.pseudo.charAt(0).toUpperCase() }}</span>
         <span class="text-h6" v-else>T</span>
+        <v-tooltip activator="parent" location="bottom">
+          Mon profil
+        </v-tooltip>
       </v-avatar>
 
       <v-btn icon class="logout-btn" @click="logout">
