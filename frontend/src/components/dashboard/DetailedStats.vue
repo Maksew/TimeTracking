@@ -15,7 +15,7 @@ const expandedPanels = ref([]);  // Pour contrôler les panneaux d'expansion
 // Données
 const groups = ref([]);
 const statistics = ref(null);
-const taskStats = ref([]);
+const organizedStats = ref([]);
 const timeSheets = ref([]);
 
 // Charger les statistiques globales de l'utilisateur
@@ -33,63 +33,79 @@ const fetchGlobalStats = async () => {
     statistics.value = response;
     timeSheets.value = allTimeSheets;
 
-    // Créer un map des feuilles de temps par ID
-    const timeSheetMap = {};
-    allTimeSheets.forEach(ts => {
-      timeSheetMap[ts.id] = ts;
-    });
-
     // Créer un map des tâches par ID
     const tasksMap = {};
     allTasks.forEach(task => {
       tasksMap[task.id] = task;
     });
 
-    // Créer un map des tâches vers leurs feuilles de temps
-    const taskToTimeSheetMap = {};
-    allTimeSheets.forEach(ts => {
-      if (ts.timeSheetTasks) {
-        ts.timeSheetTasks.forEach(tst => {
-          taskToTimeSheetMap[tst.taskId] = {
-            timeSheetId: ts.id,
-            timeSheetTitle: ts.title || `Feuille du ${new Date(ts.entryDate).toLocaleDateString()}`
-          };
-        });
-      }
-    });
-
+    // Regrouper les statistiques par feuille de temps
     if (response.categories && response.categories.length > 0) {
-      // Garder les catégories telles quelles, sans transformation
-      taskStats.value = response.categories.map(category => ({
-        id: category.category,  // Identifiant unique pour le panneau
-        title: category.category || 'Catégorie par défaut',
-        tasks: category.tasks.map(task => {
-          // Trouver la feuille de temps associée à cette tâche
-          const timeSheetInfo = taskToTimeSheetMap[task.taskId];
+      // Structure pour regrouper par feuille de temps
+      const timeSheetGroups = {};
 
-          // Récupérer le nom complet de la tâche depuis tasksMap si disponible
-          let taskName = task.taskName;
-          if (tasksMap[task.taskId]) {
-            taskName = tasksMap[task.taskId].name;
+      // Associer chaque tâche à sa feuille de temps
+      allTimeSheets.forEach(ts => {
+        if (ts.timeSheetTasks && ts.timeSheetTasks.length > 0) {
+          const title = ts.title || `Feuille du ${new Date(ts.entryDate).toLocaleDateString()}`;
+
+          // Initialiser le groupe de cette feuille si nécessaire
+          if (!timeSheetGroups[ts.id]) {
+            timeSheetGroups[ts.id] = {
+              id: ts.id,
+              title: title,
+              icon: ts.icon || 'mdi-file-document-outline',
+              tasks: []
+            };
           }
 
-          return {
-            id: task.taskId,
-            name: taskName,
-            time: `${task.totalTimeInMinutes} min`,
-            value: task.totalTimeInMinutes,
-            completion: task.percentageOfTotal || 0,
-            color: task.completion >= 100 ? 'green' : 'purple',
-            icon: task.icon || 'mdi-clipboard-check-outline',
-            timeSheetTitle: timeSheetInfo ? timeSheetInfo.timeSheetTitle : null
-          };
-        })
-      }));
+          // Ajouter chaque tâche au groupe
+          ts.timeSheetTasks.forEach(tst => {
+            // Rechercher dans les catégories pour trouver les stats de cette tâche
+            response.categories.forEach(category => {
+              const matchingTask = category.tasks.find(t => t.taskId === tst.taskId);
+              if (matchingTask) {
+                let taskName = matchingTask.taskName;
+                // Utiliser le nom complet de la tâche depuis le tasksMap si disponible
+                if (tasksMap[tst.taskId]) {
+                  taskName = tasksMap[tst.taskId].name;
+                }
+
+                timeSheetGroups[ts.id].tasks.push({
+                  id: matchingTask.taskId,
+                  name: taskName,
+                  time: `${matchingTask.totalTimeInMinutes} min`,
+                  value: matchingTask.totalTimeInMinutes,
+                  completion: matchingTask.percentageOfTotal || 0,
+                  color: matchingTask.completion >= 100 ? 'green' : 'purple',
+                  icon: matchingTask.icon || 'mdi-clipboard-check-outline'
+                });
+              }
+            });
+          });
+        }
+      });
+
+      // Convertir l'objet en tableau et trier par titre
+      organizedStats.value = Object.values(timeSheetGroups).sort((a, b) =>
+        a.title.localeCompare(b.title)
+      );
+
+      // Si aucune feuille n'est trouvée, utiliser une structure adaptée
+      if (organizedStats.value.length === 0) {
+        organizedStats.value = [{
+          id: 'default',
+          title: 'Aucune feuille de temps',
+          icon: 'mdi-file-document-outline',
+          tasks: []
+        }];
+      }
     } else {
       // Données par défaut si aucune catégorie n'existe
-      taskStats.value = [{
+      organizedStats.value = [{
         id: 'default',
-        title: 'Aucune catégorie',
+        title: 'Aucune donnée',
+        icon: 'mdi-file-document-outline',
         tasks: [{
           id: 'no-task',
           name: 'Aucune tâche disponible',
@@ -124,6 +140,7 @@ const fetchDetailedStats = async () => {
         categories.push({
           id: `user-${userId}`,
           title: userStats.userName || `Utilisateur #${userId}`,
+          icon: 'mdi-account',
           tasks: [
             {
               id: `tasks-${userId}`,
@@ -147,7 +164,7 @@ const fetchDetailedStats = async () => {
         });
       });
 
-      taskStats.value = categories;
+      organizedStats.value = categories;
     } else {
       // Sinon, charger les statistiques de l'utilisateur
       await fetchGlobalStats();
@@ -166,6 +183,7 @@ const loadGroups = async () => {
     const userGroups = await groupService.getUserGroups();
     groups.value = [
       { title: 'Tous', value: null },
+      { title: 'Personnel', value: 'personnel' },
       ...userGroups.map(group => ({
         title: group.name,
         value: group.id
@@ -262,21 +280,21 @@ onMounted(() => {
 
       <!-- Affichage des statistiques -->
       <div v-else class="mt-4">
-        <template v-if="taskStats && taskStats.length > 0">
+        <template v-if="organizedStats && organizedStats.length > 0">
           <!-- Utilisation de v-expansion-panels pour organiser les statistiques comme une feuille de temps -->
           <v-expansion-panels v-model="expandedPanels" multiple>
             <v-expansion-panel
-              v-for="(category, index) in taskStats"
-              :key="category.id || index"
+              v-for="(timeSheet, index) in organizedStats"
+              :key="timeSheet.id || index"
               :value="index"
               bg-color="#1a237e"
             >
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
-                  <v-icon class="mr-2">mdi-folder-outline</v-icon>
-                  <span>{{ category.title }}</span>
+                  <v-icon class="mr-2">{{ timeSheet.icon }}</v-icon>
+                  <span>{{ timeSheet.title }}</span>
                   <v-chip class="ml-2" size="small" color="primary">
-                    {{ category.tasks.length }} tâches
+                    {{ timeSheet.tasks.length }} tâches
                   </v-chip>
                 </div>
               </v-expansion-panel-title>
@@ -284,7 +302,7 @@ onMounted(() => {
               <v-expansion-panel-text>
                 <v-list bg-color="transparent">
                   <v-list-item
-                    v-for="(task, taskIndex) in category.tasks"
+                    v-for="(task, taskIndex) in timeSheet.tasks"
                     :key="task.id || taskIndex"
                     class="mb-3"
                   >
@@ -293,12 +311,6 @@ onMounted(() => {
                     </template>
 
                     <v-list-item-title>{{ task.name }}</v-list-item-title>
-
-                    <!-- Ajouter le titre de la feuille de temps ici si disponible -->
-                    <v-list-item-subtitle v-if="task.timeSheetTitle" class="text-caption mt-1">
-                      <v-icon size="x-small" class="mr-1">mdi-file-document-outline</v-icon>
-                      {{ task.timeSheetTitle }}
-                    </v-list-item-subtitle>
 
                     <template v-slot:append>
                       <span>{{ task.time }}</span>

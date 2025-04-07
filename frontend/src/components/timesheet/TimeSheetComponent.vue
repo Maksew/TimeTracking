@@ -93,16 +93,17 @@ const loadTimeSheets = async () => {
             // Assurer que chaque tâche a un nom à partir de la tâche trouvée
             task.name = taskDetails.name;
             task.repetition = taskDetails.repetition;
-            console.log(`Tâche trouvée pour ID ${task.taskId}: ${task.name}`);
           } else {
             // Si la tâche n'est pas trouvée, utiliser un nom par défaut
-            console.warn(`Tâche avec ID ${task.taskId} non trouvée dans le map`);
             task.name = `Tâche #${task.taskId}`;
           }
 
           return task;
         });
       }
+
+      // Ajouter une propriété pour indiquer si c'est une feuille "personnelle"
+      sheet.isPersonal = !sheet.sharedWithGroups || sheet.sharedWithGroups.length === 0;
 
       return sheet;
     });
@@ -128,9 +129,7 @@ const loadTimeSheets = async () => {
 const filteredTimeSheets = computed(() => {
   if (selectedGroup.value === 'personnel') {
     // Afficher uniquement les feuilles personnelles (non partagées)
-    return timeSheets.value.filter(sheet =>
-      !sheet.sharedWithGroups || sheet.sharedWithGroups.length === 0
-    );
+    return timeSheets.value.filter(sheet => sheet.isPersonal);
   } else if (!selectedGroup.value) {
     // Afficher toutes les feuilles
     return timeSheets.value;
@@ -139,6 +138,18 @@ const filteredTimeSheets = computed(() => {
     return timeSheets.value.filter(sheet =>
       sheet.sharedWithGroups?.some(g => g.groupId === selectedGroup.value)
     );
+  }
+});
+
+// Retourne le label du groupe actuel pour l'affichage
+const currentGroupLabel = computed(() => {
+  if (selectedGroup.value === 'personnel') {
+    return 'Personnel';
+  } else if (!selectedGroup.value) {
+    return 'Toutes les feuilles';
+  } else {
+    const group = userGroups.value.find(g => g.id === selectedGroup.value);
+    return group ? group.name : 'Groupe sélectionné';
   }
 });
 
@@ -419,6 +430,16 @@ watch(selectedGroup, () => {
           class="group-select mb-3"
         ></v-select>
 
+        <!-- Afficher le label du groupe actuel -->
+        <div v-if="selectedGroup" class="group-label mb-3">
+          <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
+            {{ currentGroupLabel }}
+            <span v-if="filteredTimeSheets.length > 0">- {{ filteredTimeSheets.length }}
+              {{ filteredTimeSheets.length > 1 ? 'feuilles' : 'feuille' }}
+            </span>
+          </span>
+        </div>
+
         <!-- Liste des feuilles de temps -->
         <div class="timesheet-container">
           <template v-if="filteredTimeSheets.length > 0">
@@ -435,6 +456,10 @@ watch(selectedGroup, () => {
                     <span>{{ timeSheet.title }}</span>
                     <v-chip class="ml-2" size="small" color="primary">
                       {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
+                    </v-chip>
+                    <!-- Indicateur pour les feuilles personnelles -->
+                    <v-chip v-if="timeSheet.isPersonal" size="x-small" class="ml-2" color="secondary">
+                      Personnel
                     </v-chip>
                   </div>
                 </v-expansion-panel-title>
@@ -569,5 +594,16 @@ watch(selectedGroup, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   z-index: 10;
+}
+
+.group-label {
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.personal-label {
+  color: #e040fb;
 }
 </style>
