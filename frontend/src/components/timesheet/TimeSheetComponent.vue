@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, computed, onUnmounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
+import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
 
 const authStore = useAuthStore();
@@ -13,6 +14,7 @@ const statusMessage = ref('');
 
 // Données principales
 const timeSheets = ref([]);
+const allTasks = ref([]);
 const userGroups = ref([]);
 const selectedGroup = ref(null);
 
@@ -56,11 +58,21 @@ const loadTimeSheets = async () => {
     loading.value = true;
     error.value = null;
 
-    // Récupérer les feuilles de temps et les groupes en parallèle
-    const [sheets, groups] = await Promise.all([
+    // Récupérer les feuilles de temps, les groupes et toutes les tâches en parallèle
+    const [sheets, groups, tasks] = await Promise.all([
       timeSheetService.getUserTimeSheets(),
-      groupService.getUserGroups()
+      groupService.getUserGroups(),
+      taskService.getAllTasks()
     ]);
+
+    // Stocker toutes les tâches
+    allTasks.value = tasks;
+
+    // Créer un map des tâches par ID pour un accès rapide
+    const tasksMap = {};
+    tasks.forEach(task => {
+      tasksMap[task.id] = task;
+    });
 
     userGroups.value = groups;
 
@@ -74,11 +86,18 @@ const loadTimeSheets = async () => {
       // S'assurer que les tâches ont les propriétés nécessaires
       if (sheet.timeSheetTasks) {
         sheet.timeSheetTasks = sheet.timeSheetTasks.map(task => {
-          // Assurer que chaque tâche a un nom (depuis l'objet task.task si possible)
-          if (task.task && task.task.name) {
-            task.name = task.task.name;
-          } else if (!task.name) {
-            task.name = `Tâche non nommée`;
+          // Récupérer le nom de la tâche depuis le tasksMap
+          const taskDetails = tasksMap[task.taskId];
+
+          if (taskDetails) {
+            // Assurer que chaque tâche a un nom à partir de la tâche trouvée
+            task.name = taskDetails.name;
+            task.repetition = taskDetails.repetition;
+            console.log(`Tâche trouvée pour ID ${task.taskId}: ${task.name}`);
+          } else {
+            // Si la tâche n'est pas trouvée, utiliser un nom par défaut
+            console.warn(`Tâche avec ID ${task.taskId} non trouvée dans le map`);
+            task.name = `Tâche #${task.taskId}`;
           }
 
           return task;

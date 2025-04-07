@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue';
 import statisticsService from '@/services/statisticsService';
+import timeSheetService from '@/services/timeSheetService';
+import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
 
 // États de l'interface
@@ -14,28 +16,74 @@ const expandedPanels = ref([]);  // Pour contrôler les panneaux d'expansion
 const groups = ref([]);
 const statistics = ref(null);
 const taskStats = ref([]);
+const timeSheets = ref([]);
 
 // Charger les statistiques globales de l'utilisateur
 const fetchGlobalStats = async () => {
   try {
     loading.value = true;
-    const response = await statisticsService.getCurrentUserStatistics();
+
+    // Charger parallèlement les statistiques et les feuilles de temps
+    const [response, allTimeSheets, allTasks] = await Promise.all([
+      statisticsService.getCurrentUserStatistics(),
+      timeSheetService.getUserTimeSheets(),
+      taskService.getAllTasks()
+    ]);
+
     statistics.value = response;
+    timeSheets.value = allTimeSheets;
+
+    // Créer un map des feuilles de temps par ID
+    const timeSheetMap = {};
+    allTimeSheets.forEach(ts => {
+      timeSheetMap[ts.id] = ts;
+    });
+
+    // Créer un map des tâches par ID
+    const tasksMap = {};
+    allTasks.forEach(task => {
+      tasksMap[task.id] = task;
+    });
+
+    // Créer un map des tâches vers leurs feuilles de temps
+    const taskToTimeSheetMap = {};
+    allTimeSheets.forEach(ts => {
+      if (ts.timeSheetTasks) {
+        ts.timeSheetTasks.forEach(tst => {
+          taskToTimeSheetMap[tst.taskId] = {
+            timeSheetId: ts.id,
+            timeSheetTitle: ts.title || `Feuille du ${new Date(ts.entryDate).toLocaleDateString()}`
+          };
+        });
+      }
+    });
 
     if (response.categories && response.categories.length > 0) {
       // Garder les catégories telles quelles, sans transformation
       taskStats.value = response.categories.map(category => ({
         id: category.category,  // Identifiant unique pour le panneau
         title: category.category || 'Catégorie par défaut',
-        tasks: category.tasks.map(task => ({
-          id: task.taskId,
-          name: task.taskName,
-          time: `${task.totalTimeInMinutes} min`,
-          value: task.totalTimeInMinutes,
-          completion: task.percentageOfTotal || 0,
-          color: task.completion >= 100 ? 'green' : 'purple',
-          icon: task.icon || 'mdi-clipboard-check-outline'
-        }))
+        tasks: category.tasks.map(task => {
+          // Trouver la feuille de temps associée à cette tâche
+          const timeSheetInfo = taskToTimeSheetMap[task.taskId];
+
+          // Récupérer le nom complet de la tâche depuis tasksMap si disponible
+          let taskName = task.taskName;
+          if (tasksMap[task.taskId]) {
+            taskName = tasksMap[task.taskId].name;
+          }
+
+          return {
+            id: task.taskId,
+            name: taskName,
+            time: `${task.totalTimeInMinutes} min`,
+            value: task.totalTimeInMinutes,
+            completion: task.percentageOfTotal || 0,
+            color: task.completion >= 100 ? 'green' : 'purple',
+            icon: task.icon || 'mdi-clipboard-check-outline',
+            timeSheetTitle: timeSheetInfo ? timeSheetInfo.timeSheetTitle : null
+          };
+        })
       }));
     } else {
       // Données par défaut si aucune catégorie n'existe
@@ -245,6 +293,12 @@ onMounted(() => {
                     </template>
 
                     <v-list-item-title>{{ task.name }}</v-list-item-title>
+
+                    <!-- Ajouter le titre de la feuille de temps ici si disponible -->
+                    <v-list-item-subtitle v-if="task.timeSheetTitle" class="text-caption mt-1">
+                      <v-icon size="x-small" class="mr-1">mdi-file-document-outline</v-icon>
+                      {{ task.timeSheetTitle }}
+                    </v-list-item-subtitle>
 
                     <template v-slot:append>
                       <span>{{ task.time }}</span>
