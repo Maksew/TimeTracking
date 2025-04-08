@@ -29,6 +29,7 @@ const formatTimeWorked = (minutes) => {
 
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
+  // Ajout des secondes (même si elles sont à 00 pour l'instant)
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
 };
 

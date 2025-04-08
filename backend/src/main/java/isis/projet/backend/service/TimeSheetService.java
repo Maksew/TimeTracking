@@ -300,16 +300,16 @@ public class TimeSheetService {
      * Met à jour la durée d'une tâche dans une feuille de temps
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche
-     * @param duration Nouvelle durée en minutes
+     * @param durationInSeconds Nouvelle durée en minutes
      * @return Tâche mise à jour
      */
-    public TimeSheetTask updateTaskDuration(Integer timeSheetId, Integer taskId, Integer duration) {
+    public TimeSheetTask updateTaskDuration(Integer timeSheetId, Integer taskId, Integer durationInSeconds) {
         TimeSheetTaskId id = new TimeSheetTaskId(taskId, timeSheetId);
 
         TimeSheetTask timeSheetTask = timeSheetTaskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Association tâche-feuille introuvable"));
 
-        timeSheetTask.setDuration(duration);
+        timeSheetTask.setDuration(durationInSeconds);
         return timeSheetTaskRepository.save(timeSheetTask);
     }
 }

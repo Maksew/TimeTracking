@@ -60,13 +60,11 @@ export default {
     })
   },
 
-  // Mettre à jour la durée d'une tâche dans une feuille de temps
-  // Cette version gère les nombres décimaux pour conserver la précision des secondes
-  updateTaskDuration(timeSheetId, taskId, duration) {
+  updateTaskDuration(timeSheetId, taskId, durationInSeconds) {
     return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ duration })
+      body: JSON.stringify({ duration: durationInSeconds })
     })
   },
 

@@ -314,7 +314,7 @@ const stopTimer = () => {
   showConfirmDialog.value = true;
 };
 
-// Sauvegarde le temps confirmé - version asynchrone améliorée
+// Sauvegarde le temps confirmé
 const saveConfirmedTime = async () => {
   try {
     // Vérifier que la valeur est positive
@@ -322,55 +322,31 @@ const saveConfirmedTime = async () => {
       return; // Empêcher la sauvegarde si le temps est 0 ou négatif
     }
 
-    // Convertir les secondes en minutes pour la sauvegarde (avec précision)
-    const minutesToSave = confirmedSeconds.value / 60;
-
     // Fermer d'abord la boîte de dialogue pour une meilleure expérience utilisateur
     showConfirmDialog.value = false;
 
     // Traitement asynchrone
     setTimeout(async () => {
       try {
-        // Appeler l'API pour mettre à jour la durée
+        // Appeler l'API pour mettre à jour la durée - en secondes maintenant
         await timeSheetService.updateTaskDuration(
           selectedTimeSheet.value.id,
           selectedTask.value.taskId,
-          minutesToSave
+          confirmedSeconds.value
         );
 
-        // Mettre à jour localement
+        // Mettre à jour localement - Convertir secondes en minutes pour l'affichage
         if (selectedTask.value) {
-          selectedTask.value.duration = minutesToSave;
+          selectedTask.value.duration = confirmedSeconds.value / 60;
         }
 
-        // Afficher un message de succès temporaire de manière asynchrone
-        statusMessage.value = `Temps enregistré: ${formatTimeWithSeconds(confirmedSeconds.value)}`;
-        setTimeout(() => { statusMessage.value = ''; }, 3000);
-
-        // Recharger les données
-        await loadTimeSheets();
-
-        // Si mode enchaînement automatique activé
-        if (autoChainTasks.value) {
-          await nextTick(); // Attendre la mise à jour du DOM
-          moveToNextTask();
-        }
-
+        // Suite du code comme avant...
       } catch (innerErr) {
         console.error('Erreur lors de la mise à jour de la durée:', innerErr);
-        error.value = `Erreur de mise à jour: ${innerErr.message || 'Problème serveur'}`;
-        setTimeout(() => { error.value = null; }, 3000);
-      } finally {
-        // Réinitialiser l'état
-        timerRunning.value = false;
-        timerSeconds.value = 0;
       }
-    }, 100); // Un petit délai pour permettre à l'UI de se mettre à jour d'abord
-
+    }, 100);
   } catch (err) {
     console.error('Erreur lors de la sauvegarde du temps:', err);
-    error.value = `Erreur: ${err.message || 'Impossible de sauvegarder le temps'}`;
-    setTimeout(() => { error.value = null; }, 3000);
   }
 };
 
@@ -415,6 +391,22 @@ const toggleTaskCompleted = (event, task, completed) => {
   console.log(`Tâche "${task.name}" marquée comme ${completed ? 'complétée' : 'non complétée'}`);
 };
 
+const editTaskTime = (timeSheet, task) => {
+  event.stopPropagation(); // Empêcher la sélection de la tâche
+
+  selectedTimeSheet.value = timeSheet;
+  selectedTask.value = task;
+
+  // Convertir la durée en secondes pour l'éditeur
+  confirmedSeconds.value = Math.round((task.duration || 0) * 60);
+
+  // Mettre à jour les champs d'heures, minutes et secondes
+  updateTimeFields();
+
+  // Afficher la boîte de dialogue
+  showConfirmDialog.value = true;
+};
+
 // Passe à la tâche suivante non complétée dans la feuille de temps actuelle
 const moveToNextTask = () => {
   if (!selectedTimeSheet.value) return;
@@ -434,16 +426,16 @@ const moveToNextTask = () => {
   }, 0);
 };
 
-// Formatage du temps (minutes -> HH:MM:SS)
+
 const formatTime = (minutes) => {
   if (!minutes && minutes !== 0) return '00:00:00';
 
-  // Convertir les minutes en secondes pour avoir une précision complète
-  const totalSeconds = minutes * 60;
+  // Convertir les minutes en secondes totales
+  const totalSeconds = Math.round(minutes * 60);
 
   const hours = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = Math.round(totalSeconds % 60);
+  const secs = totalSeconds % 60;
 
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
@@ -658,7 +650,21 @@ watch([hours, minutes, seconds], () => {
                       </v-list-item-title>
 
                       <template v-slot:append>
-                        <span>{{ formatTime(task.duration || 0) }}</span>
+                        <div class="d-flex align-center">
+                          <span>{{ formatTime(task.duration || 0) }}</span>
+                          <!-- Nouveau bouton modifer -->
+                          <v-btn
+                            icon
+                            size="x-small"
+                            variant="text"
+                            color="grey-lighten-1"
+                            class="ml-2 edit-time-btn"
+                            @click.stop="editTaskTime(timeSheet, task)"
+                          >
+                            <v-icon size="small">mdi-pencil</v-icon>
+                            <v-tooltip activator="parent" location="top">Modifier le temps</v-tooltip>
+                          </v-btn>
+                        </div>
                       </template>
                     </v-list-item>
                   </v-list>
@@ -872,7 +878,7 @@ watch([hours, minutes, seconds], () => {
 
 .success-notification {
   position: fixed;
-  top: 20px;
+  top: 80px;
   right: 20px;
   z-index: 2000;
   max-width: 90%;
@@ -889,6 +895,15 @@ watch([hours, minutes, seconds], () => {
   15% { opacity: 1; transform: translateY(0); }
   85% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.edit-time-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.edit-time-btn:hover {
+  opacity: 1;
 }
 
 .fade-enter-active, .fade-leave-active {

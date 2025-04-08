@@ -268,13 +268,12 @@ public class TimeSheetController {
             @PathVariable Integer taskId,
             @RequestBody Map<String, Integer> taskData) {
         try {
-            Integer duration = taskData.get("duration");
-            if (duration == null) {
+            Integer durationInSeconds = taskData.get("duration");
+            if (durationInSeconds == null) {
                 return ResponseEntity.badRequest().body("La durée est requise");
             }
 
-            // Utiliser le service pour mettre à jour la durée
-            TimeSheetTask updatedTask = timeSheetService.updateTaskDuration(timeSheetId, taskId, duration);
+            TimeSheetTask updatedTask = timeSheetService.updateTaskDuration(timeSheetId, taskId, durationInSeconds);
 
             return ResponseEntity.ok(updatedTask);
         } catch (Exception e) {
