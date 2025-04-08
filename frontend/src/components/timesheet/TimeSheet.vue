@@ -123,96 +123,117 @@ onUnmounted(() => {
 // Méthodes
 async function loadTemplate(id) {
   try {
-    const template = await timeSheetService.getTimeSheetById(id)
+    const [template, allTasks] = await Promise.all([
+      timeSheetService.getTimeSheetById(id),
+      taskService.getAllTasks()
+    ]);
+
+    // Créer un map des tâches par ID pour un accès rapide
+    const tasksMap = {};
+    allTasks.forEach(task => {
+      tasksMap[task.id] = task;
+    });
+
+    console.log("Template chargé:", template);
+    console.log("Toutes les tâches:", allTasks);
+    console.log("Map des tâches:", tasksMap);
 
     // Remplir les champs du formulaire
-    titre.value = template.title || ''
-    selectedIcon.value = template.icon || 'mdi-file-document'
+    titre.value = template.title || '';
+    selectedIcon.value = template.icon || 'mdi-file-document';
 
     // Dates de validité
     if (template.startDate) {
-      startDate.value = template.startDate
+      startDate.value = template.startDate;
     }
     if (template.endDate) {
-      endDate.value = template.endDate
+      endDate.value = template.endDate;
     }
 
     // Charger les tâches
     if (template.timeSheetTasks && template.timeSheetTasks.length > 0) {
-      tasks.value = template.timeSheetTasks.map(tst => ({
-        id: nextTaskId.value++,
-        name: tst.task?.name || `Tâche ${tst.taskId}`,
-        taskId: tst.taskId,
-        duration: tst.duration || 0
-      }))
+      tasks.value = template.timeSheetTasks.map(tst => {
+        // Récupérer les détails complets de la tâche
+        const taskDetails = tasksMap[tst.taskId];
+        console.log("Détails de la tâche", tst.taskId, ":", taskDetails);
+
+        return {
+          id: nextTaskId.value++,
+          name: taskDetails ? taskDetails.name : `Tâche #${tst.taskId}`,
+          taskId: tst.taskId,
+          duration: tst.duration || 0
+        };
+      });
+
+      console.log("Tâches chargées:", tasks.value);
     } else {
-      addTask() // Au moins une tâche vide
+      addTask(); // Au moins une tâche vide
     }
 
     // Groupe associé
     if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
-      selectedGroup.value = template.sharedWithGroups[0].groupId
+      selectedGroup.value = template.sharedWithGroups[0].groupId;
     } else {
       // Si pas de groupe associé, utiliser le groupe Personnel par défaut
-      selectedGroup.value = personalGroupId.value
+      selectedGroup.value = personalGroupId.value;
     }
 
     // Réinitialiser l'état des modifications
-    unsavedChanges.value = false
+    unsavedChanges.value = false;
   } catch (error) {
-    console.error('Erreur lors du chargement du modèle:', error)
-    errorMessage.value = "Impossible de charger le modèle de feuille de temps."
+    console.error('Erreur lors du chargement du modèle:', error);
+    errorMessage.value = "Impossible de charger le modèle de feuille de temps.";
   }
 }
 
 async function loadUserGroups() {
   try {
-    const groups = await groupService.getUserGroups()
-    userGroups.value = groups
+    const groups = await groupService.getUserGroups();
+    userGroups.value = groups;
   } catch (error) {
-    console.error('Erreur lors du chargement des groupes:', error)
+    console.error('Erreur lors du chargement des groupes:', error);
   }
 }
 
 function addTask() {
-  tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }) // Toujours commencer à 0
-  unsavedChanges.value = true
+  tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }); // Toujours commencer à 0
+  unsavedChanges.value = true;
 }
 
 function removeTask(index) {
-  tasks.value.splice(index, 1)
-  unsavedChanges.value = true
+  tasks.value.splice(index, 1);
+  unsavedChanges.value = true;
 }
 
 function goBack() {
   if (unsavedChanges.value) {
-    showSavePrompt.value = true
+    showSavePrompt.value = true;
   } else {
-    router.back()
+    router.back();
   }
 }
 
 function goBackWithoutSaving() {
-  showSavePrompt.value = false
-  unsavedChanges.value = false
-  router.back()
+  showSavePrompt.value = false;
+  unsavedChanges.value = false;
+  router.back();
 }
 
 async function submit() {
   // Valider le formulaire
   if (!titre.value.trim()) {
-    errorMessage.value = "Le titre est obligatoire."
-    return
+    errorMessage.value = "Le titre est obligatoire.";
+    return;
   }
 
   if (tasks.value.length === 0 || tasks.value.every(task => !task.name.trim())) {
-    errorMessage.value = "Veuillez ajouter au moins une tâche."
-    return
+    errorMessage.value = "Veuillez ajouter au moins une tâche.";
+    return;
   }
 
   try {
-    isSubmitting.value = true
-    errorMessage.value = ''
+    isSubmitting.value = true;
+    errorMessage.value = '';
 
     // Préparer les données
     const timeSheetData = {
@@ -224,50 +245,50 @@ async function submit() {
     }
 
     // Créer ou mettre à jour la feuille de temps
-    let timeSheet
+    let timeSheet;
     if (isEditing.value) {
-      timeSheetData.id = templateId.value
-      timeSheet = await timeSheetService.updateTimeSheet(templateId.value, timeSheetData)
+      timeSheetData.id = templateId.value;
+      timeSheet = await timeSheetService.updateTimeSheet(templateId.value, timeSheetData);
     } else {
-      timeSheet = await timeSheetService.createTimeSheet(timeSheetData)
+      timeSheet = await timeSheetService.createTimeSheet(timeSheetData);
     }
 
     // Ajouter ou mettre à jour les tâches
     for (const task of tasks.value) {
       if (task.name.trim()) {
         // Créer la tâche si nécessaire
-        let taskId = task.taskId
+        let taskId = task.taskId;
         if (!taskId) {
           const taskData = await taskService.createTask({
             name: task.name,
             repetition: 'NONE'
-          })
-          taskId = taskData.id
+          });
+          taskId = taskData.id;
         }
 
         // Ajouter la tâche à la feuille de temps avec durée 0
-        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0)
+        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0);
       }
     }
 
     // Partager avec le groupe si sélectionné (et que ce n'est pas le groupe Personnel virtuel)
     if (selectedGroup.value && selectedGroup.value !== 'personnel') {
-      await timeSheetService.shareTimeSheetWithGroup(timeSheet.id, selectedGroup.value, 'READ')
+      await timeSheetService.shareTimeSheetWithGroup(timeSheet.id, selectedGroup.value, 'READ');
     }
 
     // Succès
-    successMessage.value = `Feuille de temps ${isEditing.value ? 'mise à jour' : 'créée'} avec succès!`
-    unsavedChanges.value = false
+    successMessage.value = `Feuille de temps ${isEditing.value ? 'mise à jour' : 'créée'} avec succès!`;
+    unsavedChanges.value = false;
 
     // Rediriger après un court délai
     setTimeout(() => {
-      router.push('/')
-    }, 1500)
+      router.push('/');
+    }, 1500);
   } catch (error) {
-    console.error('Erreur lors de la soumission:', error)
-    errorMessage.value = `Une erreur est survenue: ${error.message || 'Veuillez réessayer.'}`
+    console.error('Erreur lors de la soumission:', error);
+    errorMessage.value = `Une erreur est survenue: ${error.message || 'Veuillez réessayer.'}`;
   } finally {
-    isSubmitting.value = false
+    isSubmitting.value = false;
   }
 }
 
@@ -283,7 +304,7 @@ function formatDate(dateString) {
 
 // Observer les changements pour détecter les modifications non enregistrées
 watch([titre, selectedIcon, tasks, selectedGroup, startDate, endDate], () => {
-  unsavedChanges.value = true
+  unsavedChanges.value = true;
 })
 </script>
 
