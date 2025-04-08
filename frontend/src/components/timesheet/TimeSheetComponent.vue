@@ -11,6 +11,7 @@ const authStore = useAuthStore();
 const loading = ref(true);
 const error = ref(null);
 const statusMessage = ref('');
+const processingTask = ref(false); // Indicateur de traitement en cours
 
 // Données principales
 const timeSheets = ref([]);
@@ -50,6 +51,12 @@ const formattedTimerDisplay = computed(() => {
   const seconds = timerSeconds.value % 60;
 
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+});
+
+// Référence à la tâche actuellement sélectionnée (pour l'affichage)
+const taskSelectionText = computed(() => {
+  if (!selectedTask.value) return '';
+  return `Tâche sélectionnée: ${selectedTask.value.name}`;
 });
 
 // Charge les feuilles de temps de l'utilisateur
@@ -166,37 +173,81 @@ const setSelectedTimeSheet = (timeSheet) => {
   }
 };
 
-// Sélectionne une tâche pour chronométrage (ne marque pas comme complétée)
+// Sélectionne une tâche pour chronométrage (ou désélectionne si c'est la même)
 const selectTask = (timeSheet, task) => {
-  // Si un timer est en cours pour une autre tâche, demander confirmation
-  if (timerRunning.value && selectedTask.value &&
-    (selectedTask.value.taskId !== task.taskId || selectedTimeSheet.value?.id !== timeSheet.id)) {
-    const confirm = window.confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et passer à cette tâche?");
-    if (!confirm) return;
-    stopTimer();
-  }
+  // Prévenir les sélections multiples trop rapides
+  if (processingTask.value) return;
 
-  // Sélectionner la tâche (sans changer son statut)
-  selectedTimeSheet.value = timeSheet;
-  selectedTask.value = task;
+  // Marquer comme étant en traitement
+  processingTask.value = true;
 
-  // Feedback visuel
-  statusMessage.value = `Tâche sélectionnée: ${task.name}`;
+  // Utilisation de setTimeout pour rendre l'opération non-bloquante
   setTimeout(() => {
-    if (statusMessage.value === `Tâche sélectionnée: ${task.name}`) {
-      statusMessage.value = '';
+    try {
+      // Si on clique sur la même tâche déjà sélectionnée, on la désélectionne
+      if (selectedTask.value && selectedTask.value.taskId === task.taskId &&
+        selectedTimeSheet.value && selectedTimeSheet.value.id === timeSheet.id) {
+
+        // Si un timer est en cours, demander confirmation (mais en mode non-bloquant)
+        if (timerRunning.value) {
+          const confirmStop = confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et désélectionner cette tâche?");
+          if (!confirmStop) {
+            processingTask.value = false;
+            return;
+          }
+
+          // Arrêter le timer de manière non-bloquante
+          clearInterval(timerInterval.value);
+          timerInterval.value = null;
+          timerRunning.value = false;
+          timerSeconds.value = 0;
+        }
+
+        // Désélectionner la tâche
+        selectedTask.value = null;
+        selectedTimeSheet.value = null;
+      } else {
+        // Si un timer est en cours pour une autre tâche, gérer de manière non-bloquante
+        if (timerRunning.value) {
+          const confirmSwitch = confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et passer à cette tâche?");
+          if (!confirmSwitch) {
+            processingTask.value = false;
+            return;
+          }
+
+          // Arrêter le timer
+          clearInterval(timerInterval.value);
+          timerInterval.value = null;
+          timerRunning.value = false;
+          timerSeconds.value = 0;
+        }
+
+        // Sélectionner la nouvelle tâche
+        selectedTimeSheet.value = timeSheet;
+        selectedTask.value = task;
+      }
+    } catch (err) {
+      console.error('Erreur lors de la sélection/désélection de tâche:', err);
+    } finally {
+      // Libérer le flag de traitement après un court délai pour éviter les clics frénétiques
+      setTimeout(() => {
+        processingTask.value = false;
+      }, 300);
     }
-  }, 2000);
+  }, 0); // setTimeout avec délai de 0ms pour rendre l'opération asynchrone
+};
+
+// Vérifie si une tâche est sélectionnée
+const isTaskSelected = (timeSheetId, taskId) => {
+  return selectedTask.value &&
+    selectedTask.value.taskId === taskId &&
+    selectedTimeSheet.value &&
+    selectedTimeSheet.value.id === timeSheetId;
 };
 
 // Démarre le chronomètre pour la tâche sélectionnée
 const startTimer = () => {
-  if (!selectedTask.value) {
-    statusMessage.value = 'Veuillez sélectionner une tâche';
-    setTimeout(() => { statusMessage.value = ''; }, 2000);
-    return;
-  }
-
+  if (!selectedTask.value) return;
   if (timerRunning.value) return;
 
   timerRunning.value = true;
@@ -205,10 +256,6 @@ const startTimer = () => {
   timerInterval.value = setInterval(() => {
     timerSeconds.value++;
   }, 1000);
-
-  // Message discret
-  statusMessage.value = `Chronométrage démarré: ${selectedTask.value.name}`;
-  setTimeout(() => { statusMessage.value = ''; }, 2000);
 };
 
 // Arrête le chronomètre et enregistre le temps passé
@@ -224,10 +271,6 @@ const stopTimer = async () => {
     try {
       await saveTaskTime(selectedTask.value, minutesSpent);
 
-      // Message discret
-      statusMessage.value = `${minutesSpent} minutes ajoutées à "${selectedTask.value.name}"`;
-      setTimeout(() => { statusMessage.value = ''; }, 2000);
-
       // Si mode enchaînement automatique activé
       if (autoChainTasks.value) {
         await nextTick(); // Attendre la mise à jour du DOM
@@ -235,8 +278,6 @@ const stopTimer = async () => {
       }
     } catch (err) {
       console.error('Erreur lors de la sauvegarde du temps:', err);
-      statusMessage.value = 'Erreur lors de la sauvegarde';
-      setTimeout(() => { statusMessage.value = ''; }, 2000);
     }
   }
 
@@ -262,7 +303,10 @@ const saveTaskTime = async (task, additionalMinutes) => {
 };
 
 // Marque explicitement une tâche comme complétée ou non
-const toggleTaskCompleted = async (task, completed) => {
+const toggleTaskCompleted = (event, task, completed) => {
+  // Arrêter la propagation pour ne pas interférer avec la sélection
+  event.stopPropagation();
+
   // Ce clic est indépendant de la sélection de tâche pour chronométrage
   task.completed = completed;
 
@@ -284,12 +328,10 @@ const moveToNextTask = () => {
   // Trouver la prochaine tâche
   let nextTaskIndex = (currentIndex + 1) % tasks.length;
 
-  // Sélectionner la tâche suivante
-  selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
-
-  // Message discret
-  statusMessage.value = `Passé à la tâche: ${tasks[nextTaskIndex].name}`;
-  setTimeout(() => { statusMessage.value = ''; }, 2000);
+  // Sélectionner la tâche suivante de manière non-bloquante
+  setTimeout(() => {
+    selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
+  }, 0);
 };
 
 // Formatage du temps (minutes -> HH:MM)
@@ -352,11 +394,6 @@ watch(selectedGroup, () => {
       <v-alert type="error" text dense>{{ error }}</v-alert>
     </div>
 
-    <!-- Message de statut discret -->
-    <div v-if="statusMessage" class="status-message">
-      {{ statusMessage }}
-    </div>
-
     <!-- Contenu principal -->
     <template v-else>
       <!-- Chronomètre -->
@@ -391,14 +428,19 @@ watch(selectedGroup, () => {
         </template>
       </div>
 
-      <!-- Information sur tâche sélectionnée -->
-      <div v-if="selectedTask" class="selected-task-info pa-2 mb-3">
+      <!-- Information sur tâche sélectionnée (style intégré) -->
+      <div v-if="selectedTask" class="selected-task-banner mx-4 mb-4">
         <div class="d-flex align-center">
-          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2"></v-icon>
-          <span class="font-weight-medium">{{ selectedTimeSheet?.title || "Feuille" }}</span>
-          <v-icon class="mx-2">mdi-chevron-right</v-icon>
-          <span class="selected-task-name">{{ selectedTask.name }}</span>
+          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2" size="small"></v-icon>
+          <span class="font-weight-medium">{{ selectedTimeSheet?.title }}</span>
+          <v-icon class="mx-2" size="small">mdi-chevron-right</v-icon>
+          <span class="task-name">{{ selectedTask.name }}</span>
         </div>
+      </div>
+
+      <!-- Information sur tâche sélectionnée (fixe en bas d'écran) -->
+      <div v-if="selectedTask" class="task-selection-indicator">
+        <span>Tâche sélectionnée: {{ selectedTask.name }}</span>
       </div>
 
       <v-card-text>
@@ -431,7 +473,7 @@ watch(selectedGroup, () => {
         ></v-select>
 
         <!-- Afficher le label du groupe actuel -->
-        <div v-if="selectedGroup" class="group-label mb-3">
+        <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
           <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
             {{ currentGroupLabel }}
             <span v-if="filteredTimeSheets.length > 0">- {{ filteredTimeSheets.length }}
@@ -470,18 +512,19 @@ watch(selectedGroup, () => {
                       v-for="task in timeSheet.timeSheetTasks"
                       :key="task.taskId"
                       :class="{
-                        'selected-task': selectedTask && selectedTask.taskId === task.taskId && selectedTimeSheet.id === timeSheet.id
+                        'selected-task': isTaskSelected(timeSheet.id, task.taskId),
+                        'task-completed': task.completed
                       }"
                       @click="selectTask(timeSheet, task)"
+                      :disabled="processingTask"
                     >
                       <template v-slot:prepend>
-                        <!-- La case à cocher contrôle seulement l'apparence visuelle,
-                             mais n'affecte pas la sélection de la tâche pour le timer -->
+                        <!-- La case à cocher pour marquer comme complété/non complété -->
                         <v-checkbox-btn
                           :model-value="task.completed"
                           color="white"
                           hide-details
-                          @click.stop="toggleTaskCompleted(task, !task.completed)"
+                          @click="(e) => toggleTaskCompleted(e, task, !task.completed)"
                         ></v-checkbox-btn>
                       </template>
 
@@ -539,6 +582,28 @@ watch(selectedGroup, () => {
   border-left: 3px solid #e040fb;
 }
 
+.selected-task-banner {
+  background-color: rgba(156, 39, 176, 0.3);
+  border-left: 3px solid #e040fb;
+  padding: 10px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: auto;
+  margin-left: 20px;
+}
+
+.selected-task-banner .task-name {
+  font-weight: 500;
+  color: #fafafa;
+}
+
+.task-completed {
+  opacity: 0.7;
+}
+
 :deep(.v-expansion-panel-text__wrapper) {
   padding: 0;
 }
@@ -567,33 +632,21 @@ watch(selectedGroup, () => {
   background-color: rgba(244, 67, 54, 0.5);
 }
 
-.selected-task-info {
-  background-color: rgba(156, 39, 176, 0.2);
-  border-left: 3px solid #e040fb;
-  padding: 8px 12px;
-  margin: 0 16px;
-  border-radius: 4px;
-}
-
-.selected-task-name {
-  font-weight: 500;
-}
-
-.status-message {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.6);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  opacity: 0.9;
-  transition: opacity 0.3s;
+.task-selection-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  color: white;
+  z-index: 100;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   max-width: 80%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  z-index: 10;
 }
 
 .group-label {
