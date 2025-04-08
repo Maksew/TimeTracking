@@ -279,9 +279,13 @@ const updateTotalSeconds = () => {
 
 // Mise à jour des heures, minutes et secondes quand confirmedSeconds change
 const updateTimeFields = () => {
-  hours.value = Math.floor(confirmedSeconds.value / 3600);
-  minutes.value = Math.floor((confirmedSeconds.value % 3600) / 60);
-  seconds.value = confirmedSeconds.value % 60;
+  // S'assurer que confirmedSeconds est un nombre valide
+  const totalSeconds = confirmedSeconds.value || 0;
+
+  // Décomposer correctement en heures:minutes:secondes
+  hours.value = Math.floor(totalSeconds / 3600);
+  minutes.value = Math.floor((totalSeconds % 3600) / 60);
+  seconds.value = totalSeconds % 60;
 };
 
 // Démarre le chronomètre pour la tâche sélectionnée
@@ -423,8 +427,8 @@ const editTaskTime = (timeSheet, task) => {
   selectedTimeSheet.value = timeSheet;
   selectedTask.value = task;
 
-  // Convertir la durée en secondes pour l'éditeur
-  confirmedSeconds.value = Math.round((task.duration || 0) * 60);
+  // S'assurer que la durée est traitée comme des secondes
+  confirmedSeconds.value = task.duration || 0;
 
   // Mettre à jour les champs d'heures, minutes et secondes
   updateTimeFields();
