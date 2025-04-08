@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, onMounted, computed, onUnmounted } from 'vue';
 import statisticsService from '@/services/statisticsService';
 import timeSheetService from '@/services/timeSheetService';
 import taskService from '@/services/taskService';
@@ -11,6 +11,7 @@ const selectedGroup = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const expandedPanels = ref([]);  // Pour contrôler les panneaux d'expansion
+const refreshInterval = ref(null);
 
 // Données
 const groups = ref([]);
@@ -18,10 +19,24 @@ const statistics = ref(null);
 const organizedStats = ref([]);
 const timeSheets = ref([]);
 
+// Fonction pour formater le temps correctement (en considérant que c'est des secondes)
+const formatTime = (timeValue) => {
+  if (timeValue === null || timeValue === undefined) return '00:00:00';
+
+  // La valeur est toujours en secondes
+  const totalSeconds = timeValue;
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 // Charger les statistiques globales de l'utilisateur
-const fetchGlobalStats = async () => {
+const fetchGlobalStats = async (silent = false) => {
   try {
-    loading.value = true;
+    if (!silent) loading.value = true;
 
     // Charger parallèlement les statistiques et les feuilles de temps
     const [response, allTimeSheets, allTasks] = await Promise.all([
@@ -119,16 +134,16 @@ const fetchGlobalStats = async () => {
     }
   } catch (err) {
     console.error('Erreur lors du chargement des statistiques globales:', err);
-    error.value = 'Impossible de charger les statistiques';
+    if (!silent) error.value = 'Impossible de charger les statistiques';
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 };
 
 // Charger les statistiques détaillées (par groupe)
-const fetchDetailedStats = async () => {
+const fetchDetailedStats = async (silent = false) => {
   try {
-    loading.value = true;
+    if (!silent) loading.value = true;
 
     if (selectedGroup.value) {
       // Si un groupe est sélectionné, charger les stats de ce groupe
@@ -167,13 +182,32 @@ const fetchDetailedStats = async () => {
       organizedStats.value = categories;
     } else {
       // Sinon, charger les statistiques de l'utilisateur
-      await fetchGlobalStats();
+      await fetchGlobalStats(silent);
     }
   } catch (err) {
     console.error('Erreur lors du chargement des statistiques détaillées:', err);
-    error.value = 'Impossible de charger les statistiques';
+    if (!silent) error.value = 'Impossible de charger les statistiques';
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
+  }
+};
+
+// Fonction centralisée pour charger les données
+const refreshData = async (silent = false) => {
+  // Si mode silencieux, ne pas afficher le loader
+  if (!silent) loading.value = true;
+
+  try {
+    if (selectedTab.value === 'global') {
+      await fetchGlobalStats(silent);
+    } else if (selectedTab.value === 'detailed') {
+      await fetchDetailedStats(silent);
+    }
+  } catch (err) {
+    console.error('Erreur lors du rafraîchissement des statistiques:', err);
+    if (!silent) error.value = 'Impossible de charger les statistiques';
+  } finally {
+    if (!silent) loading.value = false;
   }
 };
 
@@ -194,26 +228,14 @@ const loadGroups = async () => {
   }
 };
 
+// Exposer la méthode de rafraîchissement pour l'appel externe
+defineExpose({
+  refreshData
+});
+
 // Charger les données en fonction de l'onglet et du groupe sélectionnés
 const loadStats = () => {
-  if (selectedTab.value === 'global') {
-    fetchGlobalStats();
-  } else if (selectedTab.value === 'detailed') {
-    fetchDetailedStats();
-  }
-};
-
-const formatTime = (timeValue) => {
-  if (timeValue === null || timeValue === undefined) return '00:00:00';
-
-  // La valeur est toujours en secondes
-  const totalSeconds = timeValue;
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  refreshData();
 };
 
 // Observer les changements pour rafraîchir les données
@@ -228,8 +250,22 @@ watch(selectedGroup, () => {
 onMounted(() => {
   loadGroups();
   loadStats();
+
+  // Rafraîchissement périodique des données toutes les 30 secondes
+  refreshInterval.value = setInterval(() => {
+    refreshData(true); // Mode silencieux pour ne pas perturber l'interface
+  }, 30000);
+
   // Par défaut, ouvrir le premier panneau
   expandedPanels.value = [0];
+});
+
+// Nettoyage à la destruction du composant
+onUnmounted(() => {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value);
+    refreshInterval.value = null;
+  }
 });
 </script>
 

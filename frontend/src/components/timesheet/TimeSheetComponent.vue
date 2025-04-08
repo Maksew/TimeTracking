@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
 import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
+import { defineEmits } from 'vue';
 
 const authStore = useAuthStore();
 
@@ -37,6 +38,8 @@ const confirmedSeconds = ref(0);
 const hours = ref(0);
 const minutes = ref(0);
 const seconds = ref(0);
+
+const emit = defineEmits(['task-updated', 'data-changed']);
 
 // Transforme les groupes pour l'affichage dans le select
 const groupOptions = computed(() => {
@@ -340,10 +343,17 @@ const saveConfirmedTime = async () => {
         );
 
         // Mettre à jour localement
-        // ATTENTION: Ne pas convertir ici car la durée est déjà en secondes dans le backend
         if (selectedTask.value) {
           selectedTask.value.duration = confirmedSeconds.value;
         }
+
+        // Émettre un événement pour informer les autres composants
+        emit('task-updated', {
+          timeSheetId: selectedTimeSheet.value.id,
+          taskId: selectedTask.value.taskId,
+          duration: confirmedSeconds.value
+        });
+        emit('data-changed');
 
         // Message de succès
         statusMessage.value = 'Temps enregistré avec succès!';
@@ -369,6 +379,9 @@ const saveConfirmedTime = async () => {
 
         // Recharger les données pour s'assurer que tout est à jour
         await loadTimeSheets();
+
+        // Émettre un second événement après le rechargement des données
+        emit('data-changed');
       } catch (innerErr) {
         console.error('Erreur lors de la mise à jour de la durée:', innerErr);
         error.value = 'Erreur lors de la mise à jour: ' + (innerErr.message || 'Erreur inconnue');
@@ -379,6 +392,15 @@ const saveConfirmedTime = async () => {
     error.value = 'Erreur lors de la sauvegarde: ' + (err.message || 'Erreur inconnue');
   }
 };
+
+const refreshData = async () => {
+  await loadTimeSheets();
+  emit('data-changed');
+};
+
+defineExpose({
+  refreshData
+});
 
 // Annule l'enregistrement du temps
 const cancelConfirmation = () => {

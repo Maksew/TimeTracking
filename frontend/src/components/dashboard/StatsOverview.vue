@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import statisticsService from '@/services/statisticsService';
 import timeSheetService from '@/services/timeSheetService';
 
@@ -10,6 +10,7 @@ const error = ref(null);
 // Statistiques
 const statistics = ref(null);
 const timeSheets = ref([]);
+const refreshInterval = ref(null);
 
 // Compteurs calculés
 const tasksToDo = computed(() => {
@@ -23,16 +24,15 @@ const tasksCompleted = computed(() => {
   return statistics.value.summary ? statistics.value.summary.completedTasks : 0;
 });
 
-// Formatage du temps total
-const formatTimeWorked = (minutes) => {
-  if (!minutes) return '00:00:00';
+// Formatage du temps total en secondes pour l'affichage
+const formatTimeWorked = (seconds) => {
+  if (!seconds) return '00:00:00';
 
-  const totalSeconds = minutes;
-  const hours = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
 
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
 const timeWorked = computed(() => {
@@ -40,9 +40,11 @@ const timeWorked = computed(() => {
   return formatTimeWorked(statistics.value.summary ? statistics.value.summary.totalTimeInMinutes : 0);
 });
 
-// Chargement des données au montage du composant
-onMounted(async () => {
+// Fonction de rafraîchissement des données
+const refreshData = async (silent = false) => {
   try {
+    if (!silent) loading.value = true;
+
     // Charger les statistiques de l'utilisateur connecté
     const statsData = await statisticsService.getCurrentUserStatistics();
     statistics.value = statsData;
@@ -50,11 +52,35 @@ onMounted(async () => {
     // Charger les feuilles de temps pour avoir des données supplémentaires si nécessaire
     const timeSheetsData = await timeSheetService.getUserTimeSheets();
     timeSheets.value = timeSheetsData;
+
   } catch (err) {
     console.error('Erreur lors du chargement des statistiques:', err);
     error.value = err.message || 'Erreur lors du chargement des données';
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
+  }
+};
+
+// Exposer la méthode de rafraîchissement pour le parent
+defineExpose({
+  refreshData
+});
+
+// Chargement des données au montage du composant
+onMounted(() => {
+  refreshData();
+
+  // Configurer un rafraîchissement périodique
+  refreshInterval.value = setInterval(() => {
+    refreshData(true); // Mode silencieux pour ne pas perturber l'interface
+  }, 30000); // Toutes les 30 secondes
+});
+
+// Nettoyage lors du démontage
+onUnmounted(() => {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value);
+    refreshInterval.value = null;
   }
 });
 </script>

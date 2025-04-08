@@ -8,6 +8,11 @@ import TimeSheetComponent from '@/components/timesheet/TimeSheetComponent.vue';
 const authStore = useAuthStore();
 const user = computed(() => authStore.user);
 
+// Références vers les composants enfants pour pouvoir appeler leurs méthodes
+const statsOverviewRef = ref(null);
+const detailedStatsRef = ref(null);
+const timeSheetComponentRef = ref(null);
+
 // États pour le chargement
 const loading = ref(false);
 const error = ref(null);
@@ -23,6 +28,29 @@ const currentDate = computed(() => {
   const now = new Date();
   return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
 });
+
+// Méthode pour rafraîchir toutes les statistiques
+const refreshAllStats = () => {
+  console.log('Rafraîchissement des statistiques...');
+  if (statsOverviewRef.value) {
+    statsOverviewRef.value.refreshData();
+  }
+  if (detailedStatsRef.value) {
+    detailedStatsRef.value.refreshData();
+  }
+};
+
+// Méthode pour gérer le signal de mise à jour des tâches
+const handleTaskUpdated = (taskData) => {
+  console.log('Tâche mise à jour:', taskData);
+  refreshAllStats();
+};
+
+// Méthode pour gérer le signal de changement de données
+const handleDataChanged = () => {
+  console.log('Données modifiées, rafraîchissement des statistiques...');
+  refreshAllStats();
+};
 </script>
 
 <template>
@@ -50,15 +78,19 @@ const currentDate = computed(() => {
         <!-- Colonne de gauche: Métriques et statistiques -->
         <div class="dashboard-left">
           <!-- Métriques -->
-          <StatsOverview />
+          <StatsOverview ref="statsOverviewRef" />
 
           <!-- Statistiques détaillées -->
-          <DetailedStats class="mt-4" />
+          <DetailedStats ref="detailedStatsRef" class="mt-4" />
         </div>
 
         <!-- Colonne de droite: Feuilles de temps -->
         <div class="dashboard-right">
-          <TimeSheetComponent />
+          <TimeSheetComponent
+            ref="timeSheetComponentRef"
+            @task-updated="handleTaskUpdated"
+            @data-changed="handleDataChanged"
+          />
         </div>
       </div>
     </template>
