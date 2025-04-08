@@ -31,6 +31,13 @@ const selectedTimeSheet = ref(null);
 const selectedTask = ref(null);
 const autoChainTasks = ref(false);
 
+// Variables pour la boîte de dialogue de confirmation
+const showConfirmDialog = ref(false);
+const confirmedSeconds = ref(0);
+const hours = ref(0);
+const minutes = ref(0);
+const seconds = ref(0);
+
 // Transforme les groupes pour l'affichage dans le select
 const groupOptions = computed(() => {
   // Ajouter l'option "Personnel" en plus des groupes réels
@@ -46,11 +53,11 @@ const groupOptions = computed(() => {
 
 // Format le temps du chronomètre (en secondes) pour l'affichage
 const formattedTimerDisplay = computed(() => {
-  const hours = Math.floor(timerSeconds.value / 3600);
-  const minutes = Math.floor((timerSeconds.value % 3600) / 60);
-  const seconds = timerSeconds.value % 60;
+  const hrs = Math.floor(timerSeconds.value / 3600);
+  const mins = Math.floor((timerSeconds.value % 3600) / 60);
+  const secs = timerSeconds.value % 60;
 
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 });
 
 // Référence à la tâche actuellement sélectionnée (pour l'affichage)
@@ -245,6 +252,38 @@ const isTaskSelected = (timeSheetId, taskId) => {
     selectedTimeSheet.value.id === timeSheetId;
 };
 
+// Mise à jour du temps total en secondes quand heures/minutes/secondes changent
+const updateTotalSeconds = () => {
+  // S'assurer que les valeurs sont numériques et positives
+  const h = Math.max(0, parseInt(hours.value) || 0);
+  const m = Math.max(0, parseInt(minutes.value) || 0);
+  const s = Math.max(0, parseInt(seconds.value) || 0);
+
+  // Ajustement pour que les minutes et secondes soient entre 0-59
+  const adjustedSeconds = s % 60;
+  const additionalMinutes = Math.floor(s / 60);
+
+  const adjustedMinutes = (m + additionalMinutes) % 60;
+  const additionalHours = Math.floor((m + additionalMinutes) / 60);
+
+  // Mettre à jour les champs avec les valeurs ajustées si nécessaire
+  if (s !== adjustedSeconds || m !== adjustedMinutes) {
+    seconds.value = adjustedSeconds;
+    minutes.value = adjustedMinutes;
+    hours.value = h + additionalHours;
+  }
+
+  // Calculer le total en secondes
+  confirmedSeconds.value = (h * 3600) + (adjustedMinutes * 60) + adjustedSeconds;
+};
+
+// Mise à jour des heures, minutes et secondes quand confirmedSeconds change
+const updateTimeFields = () => {
+  hours.value = Math.floor(confirmedSeconds.value / 3600);
+  minutes.value = Math.floor((confirmedSeconds.value % 3600) / 60);
+  seconds.value = confirmedSeconds.value % 60;
+};
+
 // Démarre le chronomètre pour la tâche sélectionnée
 const startTimer = () => {
   if (!selectedTask.value) return;
@@ -258,31 +297,92 @@ const startTimer = () => {
   }, 1000);
 };
 
-// Arrête le chronomètre et enregistre le temps passé
-const stopTimer = async () => {
+// Arrête le chronomètre et affiche la boîte de dialogue de confirmation
+const stopTimer = () => {
   if (!timerRunning.value || !selectedTask.value || !selectedTimeSheet.value) return;
 
   clearInterval(timerInterval.value);
   timerInterval.value = null;
 
-  // Calculer les minutes passées et sauvegarder
-  const minutesSpent = Math.round(timerSeconds.value / 60);
-  if (minutesSpent > 0) {
-    try {
-      await saveTaskTime(selectedTask.value, minutesSpent);
+  // Utiliser exactement le temps du chronomètre
+  confirmedSeconds.value = timerSeconds.value;
 
-      // Si mode enchaînement automatique activé
-      if (autoChainTasks.value) {
-        await nextTick(); // Attendre la mise à jour du DOM
-        moveToNextTask();
-      }
-    } catch (err) {
-      console.error('Erreur lors de la sauvegarde du temps:', err);
+  // Mettre à jour les champs heures, minutes et secondes
+  updateTimeFields();
+
+  // Afficher la boîte de dialogue de confirmation
+  showConfirmDialog.value = true;
+};
+
+// Sauvegarde le temps confirmé - version asynchrone améliorée
+const saveConfirmedTime = async () => {
+  try {
+    // Vérifier que la valeur est positive
+    if (confirmedSeconds.value <= 0) {
+      return; // Empêcher la sauvegarde si le temps est 0 ou négatif
     }
-  }
 
+    // Convertir les secondes en minutes pour la sauvegarde (avec précision)
+    const minutesToSave = confirmedSeconds.value / 60;
+
+    // Fermer d'abord la boîte de dialogue pour une meilleure expérience utilisateur
+    showConfirmDialog.value = false;
+
+    // Traitement asynchrone
+    setTimeout(async () => {
+      try {
+        // Appeler l'API pour mettre à jour la durée
+        await timeSheetService.updateTaskDuration(
+          selectedTimeSheet.value.id,
+          selectedTask.value.taskId,
+          minutesToSave
+        );
+
+        // Mettre à jour localement
+        if (selectedTask.value) {
+          selectedTask.value.duration = minutesToSave;
+        }
+
+        // Afficher un message de succès temporaire de manière asynchrone
+        statusMessage.value = `Temps enregistré: ${formatTimeWithSeconds(confirmedSeconds.value)}`;
+        setTimeout(() => { statusMessage.value = ''; }, 3000);
+
+        // Recharger les données
+        await loadTimeSheets();
+
+        // Si mode enchaînement automatique activé
+        if (autoChainTasks.value) {
+          await nextTick(); // Attendre la mise à jour du DOM
+          moveToNextTask();
+        }
+
+      } catch (innerErr) {
+        console.error('Erreur lors de la mise à jour de la durée:', innerErr);
+        error.value = `Erreur de mise à jour: ${innerErr.message || 'Problème serveur'}`;
+        setTimeout(() => { error.value = null; }, 3000);
+      } finally {
+        // Réinitialiser l'état
+        timerRunning.value = false;
+        timerSeconds.value = 0;
+      }
+    }, 100); // Un petit délai pour permettre à l'UI de se mettre à jour d'abord
+
+  } catch (err) {
+    console.error('Erreur lors de la sauvegarde du temps:', err);
+    error.value = `Erreur: ${err.message || 'Impossible de sauvegarder le temps'}`;
+    setTimeout(() => { error.value = null; }, 3000);
+  }
+};
+
+// Annule l'enregistrement du temps
+const cancelConfirmation = () => {
+  showConfirmDialog.value = false;
   timerRunning.value = false;
   timerSeconds.value = 0;
+  confirmedSeconds.value = 0;
+  hours.value = 0;
+  minutes.value = 0;
+  seconds.value = 0;
 };
 
 // Sauvegarde le temps passé sur une tâche
@@ -334,12 +434,27 @@ const moveToNextTask = () => {
   }, 0);
 };
 
-// Formatage du temps (minutes -> HH:MM)
+// Formatage du temps (minutes -> HH:MM:SS)
 const formatTime = (minutes) => {
-  if (!minutes) return '00:00';
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  if (!minutes && minutes !== 0) return '00:00:00';
+
+  // Convertir les minutes en secondes pour avoir une précision complète
+  const totalSeconds = minutes * 60;
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.round(totalSeconds % 60);
+
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+// Formatage du temps complet (secondes -> HH:MM:SS)
+const formatTimeWithSeconds = (totalSeconds) => {
+  if (!totalSeconds) return '00:00:00';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
 // Nettoyer l'intervalle du chronomètre lors du démontage du composant
@@ -367,6 +482,14 @@ watch(selectedGroup, () => {
     // Sélectionner la première feuille du nouveau filtre
     setSelectedTimeSheet(filteredTimeSheets.value[0]);
   }
+});
+
+// Observer les changements de confirmedSeconds pour mettre à jour les champs de temps
+watch(confirmedSeconds, updateTimeFields);
+
+// Observer les changements des champs de temps pour mettre à jour confirmedSeconds
+watch([hours, minutes, seconds], () => {
+  updateTotalSeconds();
 });
 </script>
 
@@ -557,6 +680,86 @@ watch(selectedGroup, () => {
         </div>
       </v-card-text>
     </template>
+
+    <!-- Boîte de dialogue de confirmation du temps -->
+    <v-dialog v-model="showConfirmDialog" max-width="400" persistent>
+      <v-card color="#283593" dark>
+        <v-card-title class="text-h5">
+          <v-icon start class="mr-2">mdi-clock-check-outline</v-icon>
+          Confirmer le temps
+        </v-card-title>
+
+        <v-card-text class="pb-4 pt-4">
+          <p class="mb-2">Tâche: <strong>{{ selectedTask?.name }}</strong></p>
+          <p class="mb-4">Confirmez ou ajustez le temps passé sur cette tâche :</p>
+
+          <div class="time-display text-center mb-6">
+            <div class="text-h2 font-weight-bold">
+              {{ hours.toString().padStart(2, '0') }}:{{ minutes.toString().padStart(2, '0') }}:{{ seconds.toString().padStart(2, '0') }}
+            </div>
+            <div class="text-caption">Heures:Minutes:Secondes</div>
+          </div>
+
+          <v-row>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="hours"
+                label="Heures"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="minutes"
+                label="Minutes"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                max="59"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="seconds"
+                label="Secondes"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                max="59"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </v-card-text>
+
+        <v-divider></v-divider>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="cancelConfirmation">
+            Annuler
+          </v-btn>
+          <v-btn color="primary" @click="saveConfirmedTime" :disabled="confirmedSeconds <= 0">
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Notification asynchrone et non bloquante -->
+    <transition name="fade">
+      <div v-if="statusMessage" class="success-notification">
+        <v-icon class="mr-2" color="white">mdi-check-circle</v-icon>
+        {{ statusMessage }}
+      </div>
+    </transition>
   </v-card>
 </template>
 
@@ -658,5 +861,40 @@ watch(selectedGroup, () => {
 
 .personal-label {
   color: #e040fb;
+}
+
+.time-display {
+  background-color: rgba(26, 35, 126, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.success-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  max-width: 90%;
+  background-color: rgba(76, 175, 80, 0.9);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: fadeInOut 3s ease;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-20px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>

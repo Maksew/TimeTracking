@@ -11,6 +11,21 @@ export default {
     return doAjaxRequestWithAuth(`/api/timesheets/${id}`)
   },
 
+  // Récupérer les feuilles de temps par date
+  getTimeSheetsByDate(date) {
+    return doAjaxRequestWithAuth(`/api/timesheets/byDate?date=${date}`)
+  },
+
+  // Récupérer les feuilles de temps partagées avec l'utilisateur
+  getSharedTimeSheets() {
+    return doAjaxRequestWithAuth('/api/timesheets/shared')
+  },
+
+  // Récupérer les feuilles de temps partagées avec un groupe
+  getGroupTimeSheets(groupId) {
+    return doAjaxRequestWithAuth(`/api/timesheets/group/${groupId}`)
+  },
+
   // Créer une nouvelle feuille de temps
   createTimeSheet(timeSheet) {
     return doAjaxRequestWithAuth('/api/timesheets', {
@@ -20,6 +35,7 @@ export default {
     })
   },
 
+  // Mettre à jour une feuille de temps
   updateTimeSheet(id, timeSheet) {
     return doAjaxRequestWithAuth(`/api/timesheets/${id}`, {
       method: 'PUT',
@@ -28,6 +44,7 @@ export default {
     })
   },
 
+  // Supprimer une feuille de temps
   deleteTimeSheet(id) {
     return doAjaxRequestWithAuth(`/api/timesheets/${id}`, {
       method: 'DELETE'
@@ -43,9 +60,45 @@ export default {
     })
   },
 
+  // Mettre à jour la durée d'une tâche dans une feuille de temps
+  // Cette version gère les nombres décimaux pour conserver la précision des secondes
+  updateTaskDuration(timeSheetId, taskId, duration) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration })
+    })
+  },
+
+  // Partager une feuille de temps avec un utilisateur
+  shareTimeSheetWithUser(timeSheetId, userId, accessLevel) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/share/user/${userId}?accessLevel=${accessLevel}`, {
+      method: 'POST'
+    })
+  },
+
+  // Partager une feuille de temps avec un groupe
   shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel) {
     return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/share/group/${groupId}?accessLevel=${accessLevel}`, {
       method: 'POST'
-    });
+    })
+  },
+
+  // Exporter les feuilles de temps au format CSV
+  exportTimeSheetsToCsv(startDate, endDate) {
+    let url = '/api/timesheets/export/csv';
+    if (startDate || endDate) {
+      const params = [];
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      url += `?${params.join('&')}`;
+    }
+
+    return doAjaxRequestWithAuth(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'text/csv'
+      }
+    })
   }
 }
