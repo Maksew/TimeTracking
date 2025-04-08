@@ -27,10 +27,12 @@ const tasksCompleted = computed(() => {
 const formatTimeWorked = (minutes) => {
   if (!minutes) return '00:00:00';
 
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  // Ajout des secondes (même si elles sont à 00 pour l'instant)
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+  const totalSeconds = minutes;
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
 const timeWorked = computed(() => {

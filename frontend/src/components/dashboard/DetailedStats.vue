@@ -203,6 +203,19 @@ const loadStats = () => {
   }
 };
 
+const formatTime = (timeValue) => {
+  if (timeValue === null || timeValue === undefined) return '00:00:00';
+
+  // La valeur est toujours en secondes
+  const totalSeconds = timeValue;
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 // Observer les changements pour rafraîchir les données
 watch(selectedTab, loadStats);
 watch(selectedGroup, () => {
@@ -313,7 +326,7 @@ onMounted(() => {
                     <v-list-item-title>{{ task.name }}</v-list-item-title>
 
                     <template v-slot:append>
-                      <span>{{ task.time }}</span>
+                      <span>{{ formatTime(task.value) }}</span>
                     </template>
 
                     <v-list-item-subtitle class="mt-2">

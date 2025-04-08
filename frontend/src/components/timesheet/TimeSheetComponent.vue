@@ -460,10 +460,8 @@ const moveToNextTask = () => {
 const formatTime = (timeValue) => {
   if (timeValue === null || timeValue === undefined) return '00:00:00';
 
-  // Vérifier si la valeur est déjà en secondes ou non
-  // Si la valeur est petite (< 1000), il s'agit probablement de minutes
-  // sinon, il s'agit probablement de secondes
-  const totalSeconds = timeValue < 1000 ? Math.round(timeValue * 60) : timeValue;
+  // Considérer que timeValue est toujours en secondes
+  const totalSeconds = timeValue;
 
   const hours = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
