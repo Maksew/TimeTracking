@@ -328,25 +328,51 @@ const saveConfirmedTime = async () => {
     // Traitement asynchrone
     setTimeout(async () => {
       try {
-        // Appeler l'API pour mettre à jour la durée - en secondes maintenant
+        // Appeler l'API pour mettre à jour la durée en secondes
         await timeSheetService.updateTaskDuration(
           selectedTimeSheet.value.id,
           selectedTask.value.taskId,
           confirmedSeconds.value
         );
 
-        // Mettre à jour localement - Convertir secondes en minutes pour l'affichage
+        // Mettre à jour localement
+        // ATTENTION: Ne pas convertir ici car la durée est déjà en secondes dans le backend
         if (selectedTask.value) {
-          selectedTask.value.duration = confirmedSeconds.value / 60;
+          selectedTask.value.duration = confirmedSeconds.value;
         }
 
-        // Suite du code comme avant...
+        // Message de succès
+        statusMessage.value = 'Temps enregistré avec succès!';
+
+        // Réinitialiser complètement l'état du chronomètre
+        timerRunning.value = false;
+        timerSeconds.value = 0;
+        confirmedSeconds.value = 0;
+
+        // Si autoChainTasks est activé, passer à la tâche suivante
+        if (autoChainTasks.value) {
+          moveToNextTask();
+        } else {
+          // Sinon, désélectionner la tâche actuelle
+          selectedTask.value = null;
+          selectedTimeSheet.value = null;
+        }
+
+        // Masquer le message après 3 secondes
+        setTimeout(() => {
+          statusMessage.value = '';
+        }, 3000);
+
+        // Recharger les données pour s'assurer que tout est à jour
+        await loadTimeSheets();
       } catch (innerErr) {
         console.error('Erreur lors de la mise à jour de la durée:', innerErr);
+        error.value = 'Erreur lors de la mise à jour: ' + (innerErr.message || 'Erreur inconnue');
       }
     }, 100);
   } catch (err) {
     console.error('Erreur lors de la sauvegarde du temps:', err);
+    error.value = 'Erreur lors de la sauvegarde: ' + (err.message || 'Erreur inconnue');
   }
 };
 
@@ -427,11 +453,13 @@ const moveToNextTask = () => {
 };
 
 
-const formatTime = (minutes) => {
-  if (!minutes && minutes !== 0) return '00:00:00';
+const formatTime = (timeValue) => {
+  if (timeValue === null || timeValue === undefined) return '00:00:00';
 
-  // Convertir les minutes en secondes totales
-  const totalSeconds = Math.round(minutes * 60);
+  // Vérifier si la valeur est déjà en secondes ou non
+  // Si la valeur est petite (< 1000), il s'agit probablement de minutes
+  // sinon, il s'agit probablement de secondes
+  const totalSeconds = timeValue < 1000 ? Math.round(timeValue * 60) : timeValue;
 
   const hours = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
