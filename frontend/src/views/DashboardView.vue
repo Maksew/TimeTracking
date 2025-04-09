@@ -4,6 +4,10 @@ import { useAuthStore } from '@/stores/auth';
 import StatsOverview from '@/components/dashboard/StatsOverview.vue';
 import DetailedStats from '@/components/dashboard/DetailedStats.vue';
 import TimeSheetComponent from '@/components/timesheet/TimeSheetComponent.vue';
+import { useRouter, useRoute } from 'vue-router';
+
+const router = useRouter();
+const route = useRoute();
 
 const authStore = useAuthStore();
 const user = computed(() => authStore.user);
@@ -51,6 +55,22 @@ const handleDataChanged = () => {
   console.log('Données modifiées, rafraîchissement des statistiques...');
   refreshAllStats();
 };
+
+onMounted(() => {
+  if (route.query.force_refresh === 'true') {
+    console.log('Rafraîchissement forcé demandé après édition de feuille de temps');
+    // Supprimer le paramètre de l'URL sans recharger la page
+    router.replace({ query: {} });
+    // Attendre un peu pour s'assurer que les composants sont montés
+    setTimeout(() => {
+      refreshAllStats();
+      if (timeSheetComponentRef.value) {
+        timeSheetComponentRef.value.refreshData();
+      }
+    }, 200);
+  }
+});
+
 </script>
 
 <template>

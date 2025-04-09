@@ -312,4 +312,22 @@ public class TimeSheetService {
         timeSheetTask.setDuration(durationInSeconds);
         return timeSheetTaskRepository.save(timeSheetTask);
     }
+
+    /**
+     * Supprime une tâche d'une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param taskId ID de la tâche
+     */
+    public void removeTaskFromTimeSheet(Integer timeSheetId, Integer taskId) {
+        // Créer l'ID composite
+        TimeSheetTaskId id = new TimeSheetTaskId(taskId, timeSheetId);
+
+        // Vérifier si la relation existe
+        if (timeSheetTaskRepository.existsById(id)) {
+            // Supprimer la relation
+            timeSheetTaskRepository.deleteById(id);
+        } else {
+            throw new RuntimeException("Association tâche-feuille de temps introuvable");
+        }
+    }
 }

@@ -82,6 +82,12 @@ export default {
     })
   },
 
+  removeTaskFromTimeSheet(timeSheetId, taskId) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/tasks/${taskId}`, {
+      method: 'DELETE'
+    })
+  },
+
   // Exporter les feuilles de temps au format CSV
   exportTimeSheetsToCsv(startDate, endDate) {
     let url = '/api/timesheets/export/csv';

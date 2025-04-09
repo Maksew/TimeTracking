@@ -6,6 +6,7 @@ import timeSheetService from '@/services/timeSheetService'
 import taskService from '@/services/taskService'
 import groupService from '@/services/groupService'
 
+
 const router = useRouter()
 const route = useRoute()
 
@@ -244,6 +245,28 @@ async function submit() {
       endDate: endDate.value
     }
 
+    // Stockage des durées existantes (pour les préserver)
+    const existingTaskDurations = {};
+    let originalTimeSheet = null;
+
+    // Si c'est une mise à jour, récupérer les durées existantes
+    if (isEditing.value) {
+      try {
+        // Récupérer la feuille de temps existante avec ses tâches
+        originalTimeSheet = await timeSheetService.getTimeSheetById(templateId.value);
+
+        // Stocker les durées existantes par ID de tâche
+        if (originalTimeSheet.timeSheetTasks && originalTimeSheet.timeSheetTasks.length > 0) {
+          originalTimeSheet.timeSheetTasks.forEach(taskRelation => {
+            existingTaskDurations[taskRelation.taskId] = taskRelation.duration || 0;
+          });
+        }
+        console.log('Durées existantes récupérées:', existingTaskDurations);
+      } catch (error) {
+        console.warn("Impossible de récupérer les durées existantes:", error);
+      }
+    }
+
     // Créer ou mettre à jour la feuille de temps
     let timeSheet;
     if (isEditing.value) {
@@ -251,6 +274,19 @@ async function submit() {
       timeSheet = await timeSheetService.updateTimeSheet(templateId.value, timeSheetData);
     } else {
       timeSheet = await timeSheetService.createTimeSheet(timeSheetData);
+    }
+
+    // Si c'est une mise à jour, supprimer d'abord toutes les tâches existantes
+    if (isEditing.value && originalTimeSheet && originalTimeSheet.timeSheetTasks) {
+      try {
+        for (const task of originalTimeSheet.timeSheetTasks) {
+          // Supprimer la relation tâche-feuille
+          await timeSheetService.removeTaskFromTimeSheet(timeSheet.id, task.taskId);
+        }
+        console.log('Anciennes tâches supprimées avec succès');
+      } catch (error) {
+        console.warn("Erreur lors de la suppression des tâches existantes:", error);
+      }
     }
 
     // Ajouter ou mettre à jour les tâches
@@ -266,8 +302,14 @@ async function submit() {
           taskId = taskData.id;
         }
 
-        // Ajouter la tâche à la feuille de temps avec durée 0
-        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, 0);
+        // Déterminer la durée à utiliser (préserver l'ancienne si elle existe)
+        let duration = 0;
+        if (existingTaskDurations[taskId] !== undefined) {
+          duration = existingTaskDurations[taskId];
+        }
+
+        // Ajouter la tâche à la feuille de temps avec la durée appropriée
+        await timeSheetService.addTaskToTimeSheet(timeSheet.id, taskId, duration);
       }
     }
 
@@ -280,10 +322,13 @@ async function submit() {
     successMessage.value = `Feuille de temps ${isEditing.value ? 'mise à jour' : 'créée'} avec succès!`;
     unsavedChanges.value = false;
 
-    // Rediriger après un court délai
+    // Forcer une attente pour laisser le temps au serveur de traiter les modifications
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Rediriger après un court délai avec un paramètre force_refresh
     setTimeout(() => {
-      router.push('/');
-    }, 1500);
+      router.push('/?force_refresh=true');
+    }, 1000);
   } catch (error) {
     console.error('Erreur lors de la soumission:', error);
     errorMessage.value = `Une erreur est survenue: ${error.message || 'Veuillez réessayer.'}`;

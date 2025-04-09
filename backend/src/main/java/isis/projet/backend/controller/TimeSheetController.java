@@ -280,4 +280,24 @@ public class TimeSheetController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    /**
+     * Supprime une tâche d'une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param taskId ID de la tâche
+     * @return Statut de l'opération
+     */
+    @DeleteMapping("/{timeSheetId}/tasks/{taskId}")
+    public ResponseEntity<?> removeTaskFromTimeSheet(
+            @PathVariable Integer timeSheetId,
+            @PathVariable Integer taskId) {
+        try {
+            // Appeler le service pour supprimer la tâche de la feuille de temps
+            timeSheetService.removeTaskFromTimeSheet(timeSheetId, taskId);
+
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
