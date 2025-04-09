@@ -84,6 +84,24 @@ function filterAndSortGroups(groups) {
   });
 }
 
+const loadGroupMembers = async (group) => {
+  if (!group || !group.userGroups) return;
+
+  // Pour chaque UserGroup qui n'a pas d'information utilisateur complète
+  for (const userGroup of group.userGroups) {
+    if (!userGroup.user || !userGroup.user.pseudo) {
+      try {
+        // Charger les détails de l'utilisateur
+        const userData = await groupService.getGroupMemberDetails(userGroup.userId);
+        // Mettre à jour l'objet userGroup avec les données complètes
+        userGroup.user = userData;
+      } catch (err) {
+        console.error(`Erreur lors du chargement des détails pour l'utilisateur #${userGroup.userId}:`, err);
+      }
+    }
+  }
+};
+
 onMounted(async () => {
   try {
     const groups = await groupService.getUserGroups();
@@ -102,6 +120,11 @@ onMounted(async () => {
     // Si aucun groupe créé mais des groupes rejoints, activer l'onglet "Groupes rejoints"
     if (myGroups.value.length === 0 && joinedGroups.value.length > 0) {
       activeTab.value = 1;
+    }
+
+    // Précharger les détails des membres pour tous les groupes
+    for (const group of [...myGroups.value, ...joinedGroups.value]) {
+      await loadGroupMembers(group);
     }
   } catch (err) {
     console.error('Erreur lors du chargement des groupes:', err);
@@ -169,9 +192,17 @@ const joinGroup = async () => {
 
 const showGroupDetails = async (group) => {
   selectedGroup.value = group;
-  // Ici, on pourrait charger des détails supplémentaires si nécessaire
-  groupDetails.value = { ...group };
-  showGroupDetailsDialog.value = true; // Ouvrir le dialogue
+  // Charger les détails complets du groupe
+  try {
+    // Charger les détails des membres manquants
+    await loadGroupMembers(group);
+    // Mettre à jour les détails du groupe
+    groupDetails.value = { ...group };
+    showGroupDetailsDialog.value = true;
+  } catch (err) {
+    console.error('Erreur lors du chargement des détails du groupe:', err);
+    error.value = 'Impossible de charger tous les détails du groupe';
+  }
 };
 
 const showShareCode = (group) => {

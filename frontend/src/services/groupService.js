@@ -1,4 +1,5 @@
-// src/services/groupService.js
+// src/services/groupService.js - Version corrigée
+
 import { doAjaxRequestWithAuth } from '@/util/httpInterceptor'
 import { useAuthStore } from '@/stores/auth'
 
@@ -8,15 +9,21 @@ export default {
     return doAjaxRequestWithAuth('/api/groups')
   },
 
-  // Récupérer les groupes de l'utilisateur connecté
+  // Récupérer les groupes de l'utilisateur connecté avec les membres complets
   getUserGroups() {
     const authStore = useAuthStore()
-    return doAjaxRequestWithAuth(`/api/groups/user/${authStore.user.id}`)
+    // Ajout du paramètre includeMembers=true pour demander au backend de charger les détails des membres
+    return doAjaxRequestWithAuth(`/api/groups/user/${authStore.user.id}?includeMembers=true`)
   },
 
-  // Récupérer un groupe par son ID
+  // Récupérer un groupe par son ID avec tous les détails des membres
   getGroupById(id) {
-    return doAjaxRequestWithAuth(`/api/groups/${id}`)
+    return doAjaxRequestWithAuth(`/api/groups/${id}?includeMembers=true`)
+  },
+
+  // Charger les détails d'un membre du groupe par son ID
+  getGroupMemberDetails(userId) {
+    return doAjaxRequestWithAuth(`/api/users/${userId}`)
   },
 
   // Créer un nouveau groupe

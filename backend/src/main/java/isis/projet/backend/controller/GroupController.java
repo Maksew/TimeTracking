@@ -2,6 +2,7 @@ package isis.projet.backend.controller;
 
 import isis.projet.backend.entity.Group;
 import isis.projet.backend.entity.User;
+import isis.projet.backend.entity.UserGroup;
 import isis.projet.backend.service.GroupService;
 import isis.projet.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,15 +28,36 @@ public class GroupController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Group> getGroupById(@PathVariable Integer id) {
+    public ResponseEntity<Group> getGroupById(
+            @PathVariable Integer id,
+            @RequestParam(defaultValue = "false") boolean includeMembers) {
+
         Optional<Group> group = groupService.getGroupById(id);
+
+        // Si le paramètre includeMembers est true, charger les détails des membres
+        if (includeMembers && group.isPresent()) {
+            groupService.loadGroupMembersDetails(group.get());
+        }
+
         return group.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/user/{userId}")
-    public List<Group> getGroupsByUserId(@PathVariable Integer userId) {
-        return groupService.getGroupsByUserId(userId);
+    public List<Group> getGroupsByUserId(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "false") boolean includeMembers) {
+
+        List<Group> groups = groupService.getGroupsByUserId(userId);
+
+        // Si le paramètre includeMembers est true, charger les détails des membres pour chaque groupe
+        if (includeMembers) {
+            for (Group group : groups) {
+                groupService.loadGroupMembersDetails(group);
+            }
+        }
+
+        return groups;
     }
 
     @PostMapping

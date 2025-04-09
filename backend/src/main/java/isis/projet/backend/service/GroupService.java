@@ -24,7 +24,7 @@ public class GroupService {
     private UserGroupRepository userGroupRepository;
 
     @Autowired
-    private UserRepository userRepository; // Ajout du UserRepository
+    private UserRepository userRepository;
 
     public List<Group> getAllGroups() {
         return groupRepository.findAll();
@@ -35,23 +35,26 @@ public class GroupService {
     }
 
     public List<Group> getGroupsByUserId(Integer userId) {
-        // Récupérer tous les groupes de l'utilisateur
-        List<Group> groups = groupRepository.findByUserId(userId);
+        return groupRepository.findByUserId(userId);
+    }
 
-        // Pour chaque groupe, charger complètement les données des utilisateurs
-        for (Group group : groups) {
-            if (group.getUserGroups() != null) {
-                for (UserGroup userGroup : group.getUserGroups()) {
-                    // Si l'objet User n'est pas complètement chargé
-                    if (userGroup.getUser() == null || userGroup.getUser().getPseudo() == null) {
-                        Optional<User> fullUser = userRepository.findById(userGroup.getUserId());
-                        fullUser.ifPresent(userGroup::setUser);
-                    }
-                }
+    /**
+     * Charge les détails complets des membres d'un groupe
+     * Cette méthode s'assure que chaque UserGroup a un objet User complet avec toutes ses propriétés
+     * @param group Le groupe dont on veut charger les membres
+     */
+    public void loadGroupMembersDetails(Group group) {
+        if (group == null || group.getUserGroups() == null) return;
+
+        for (UserGroup userGroup : group.getUserGroups()) {
+            // Si l'utilisateur n'est pas complètement chargé
+            if (userGroup.getUser() == null || userGroup.getUser().getPseudo() == null) {
+                // Récupérer les détails complets de l'utilisateur
+                Optional<User> fullUser = userRepository.findById(userGroup.getUserId());
+                // Mettre à jour l'association
+                fullUser.ifPresent(userGroup::setUser);
             }
         }
-
-        return groups;
     }
 
     @Transactional
@@ -65,7 +68,7 @@ public class GroupService {
         userGroup.setUserId(owner.getId());
         userGroup.setGroupId(savedGroup.getId());
         userGroup.setRole("OWNER");
-        userGroup.setUser(owner); // S'assurer que l'objet User complet est défini
+        userGroup.setUser(owner);
         userGroup.setGroup(savedGroup);
 
         userGroupRepository.save(userGroup);
@@ -114,7 +117,7 @@ public class GroupService {
         userGroup.setUserId(user.getId());
         userGroup.setGroupId(group.getId());
         userGroup.setRole("MEMBER");
-        userGroup.setUser(user); // S'assurer que l'objet User complet est défini
+        userGroup.setUser(user);
         userGroup.setGroup(group);
 
         userGroupRepository.save(userGroup);
