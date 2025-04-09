@@ -118,23 +118,19 @@ public class TimeSheetService {
      * @return Tâche ajoutée à la feuille de temps
      */
     public TimeSheetTask addTaskToTimeSheet(Integer timeSheetId, Integer taskId, Integer duration) {
-        // Retrieve the timesheet from the database
         TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
                 .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
 
-        // Retrieve the task from the database
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-
-        // Create the TimeSheetTask entity by setting the composite key and relationships
-        TimeSheetTask timeSheetTask = TimeSheetTask.builder()
-                .timeSheetId(timeSheet.getId())
-                .taskId(task.getId())
-                .duration(duration)
-                .timeSheet(timeSheet)
-                .task(task)
-                .build();
+        TimeSheetTask timeSheetTask = new TimeSheetTask();
+        timeSheetTask.setTimeSheetId(timeSheet.getId());
+        timeSheetTask.setTaskId(task.getId());
+        timeSheetTask.setDuration(duration);
+        timeSheetTask.setCompleted(false);
+        timeSheetTask.setTimeSheet(timeSheet);
+        timeSheetTask.setTask(task);
 
         // Save the association entity
         return timeSheetTaskRepository.save(timeSheetTask);

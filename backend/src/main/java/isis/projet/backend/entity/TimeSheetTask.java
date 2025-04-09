@@ -26,6 +26,14 @@ public class TimeSheetTask {
     @Column(name = "completed", nullable = false)
     private Boolean completed = false;
 
+    @PrePersist
+    @PreUpdate
+    public void ensureCompletedIsNotNull() {
+        if (this.completed == null) {
+            this.completed = false;
+        }
+    }
+
     @ManyToOne
     @JoinColumn(name = "task_id", insertable = false, updatable = false)
     @JsonBackReference("task-timesheettasks")
