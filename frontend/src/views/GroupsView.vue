@@ -134,6 +134,13 @@ const createGroup = async () => {
   }
 };
 
+const getCorrectMemberCount = (group) => {
+  if (!group || !group.userGroups || group.userGroups.length === 0) {
+    return 1;
+  }
+  return group.userGroups.length;
+}
+
 const joinGroup = async () => {
   if (!invitationCode.value.trim()) {
     error.value = 'Veuillez saisir un code d\'invitation';
@@ -340,7 +347,8 @@ const closeGroupDetails = () => {
                     <v-card-text>
                       <div class="d-flex align-center mb-2">
                         <v-icon size="small" class="mr-2">mdi-account-multiple</v-icon>
-                        <span>{{ group.userGroups.length }} membres</span>
+                        <span>{{ group.userGroups && group.userGroups.length > 0 ? group.userGroups.length : 1 }}
+                          membre{{ group.userGroups && group.userGroups.length !== 1 ? 's' : '' }}</span>
                       </div>
 
                       <div class="d-flex align-center mb-2">
@@ -444,7 +452,7 @@ const closeGroupDetails = () => {
                     <v-card-text>
                       <div class="d-flex align-center mb-2">
                         <v-icon size="small" class="mr-2">mdi-account-multiple</v-icon>
-                        <span>{{ group.userGroups.length }} membres</span>
+                        <span>{{ getCorrectMemberCount(group) }} membre{{ getCorrectMemberCount(group) !== 1 ? 's' : '' }}</span>
                       </div>
 
                       <div class="d-flex align-center mb-2">
@@ -650,7 +658,7 @@ const closeGroupDetails = () => {
                   <template v-slot:prepend>
                     <v-icon>mdi-account-multiple</v-icon>
                   </template>
-                  <v-list-item-title>{{ selectedGroup.userGroups.length }} membres</v-list-item-title>
+                  <v-list-item-title>{{ getCorrectMemberCount(selectedGroup) }} membre{{ getCorrectMemberCount(selectedGroup) !== 1 ? 's' : '' }}</v-list-item-title>
                 </v-list-item>
 
                 <v-list-item v-if="selectedGroup.invitCode">
@@ -721,7 +729,8 @@ const closeGroupDetails = () => {
                   </template>
 
                   <v-list-item-title>
-                    {{ userGroup.user ? userGroup.user.pseudo : `Utilisateur #${userGroup.userId}` }}
+                    {{ userGroup.user && userGroup.user.pseudo ? userGroup.user.pseudo :
+                    (userGroup.userId === authStore.user.id ? authStore.user.pseudo : `Utilisateur #${userGroup.userId}`) }}
                     <v-chip
                       v-if="userGroup.role === 'OWNER'"
                       size="x-small"
