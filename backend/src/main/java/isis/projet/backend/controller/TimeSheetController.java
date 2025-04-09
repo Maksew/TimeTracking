@@ -282,6 +282,32 @@ public class TimeSheetController {
     }
 
     /**
+     * Met à jour l'état "complété" d'une tâche dans une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param taskId ID de la tâche
+     * @param completionData Données avec l'état "complété"
+     * @return Statut de l'opération
+     */
+    @PutMapping("/{timeSheetId}/tasks/{taskId}/complete")
+    public ResponseEntity<?> updateTaskCompletionState(
+            @PathVariable Integer timeSheetId,
+            @PathVariable Integer taskId,
+            @RequestBody Map<String, Boolean> completionData) {
+        try {
+            Boolean isCompleted = completionData.get("completed");
+            if (isCompleted == null) {
+                return ResponseEntity.badRequest().body("L'état de complétion est requis");
+            }
+
+            TimeSheetTask updatedTask = timeSheetService.updateTaskCompletionState(timeSheetId, taskId, isCompleted);
+
+            return ResponseEntity.ok(updatedTask);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
      * Supprime une tâche d'une feuille de temps
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche

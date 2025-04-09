@@ -92,8 +92,9 @@ const fetchGlobalStats = async (silent = false) => {
                   time: `${matchingTask.totalTimeInMinutes} min`,
                   value: matchingTask.totalTimeInMinutes,
                   completion: matchingTask.percentageOfTotal || 0,
-                  color: matchingTask.completion >= 100 ? 'green' : 'purple',
-                  icon: matchingTask.icon || 'mdi-clipboard-check-outline'
+                  color: matchingTask.totalTimeInMinutes > 0 ? 'green' : 'purple', // Utiliser seulement la durée
+                  icon: matchingTask.icon || 'mdi-clipboard-check-outline',
+                  completed: matchingTask.totalTimeInMinutes > 0 // Considérer comme complété si durée > 0
                 });
               }
             });

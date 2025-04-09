@@ -23,6 +23,9 @@ public class TimeSheetTask {
     @Column(name = "duration", nullable = false)
     private Integer duration;
 
+    @Column(name = "completed", nullable = false)
+    private Boolean completed = false;
+
     @ManyToOne
     @JoinColumn(name = "task_id", insertable = false, updatable = false)
     @JsonBackReference("task-timesheettasks")

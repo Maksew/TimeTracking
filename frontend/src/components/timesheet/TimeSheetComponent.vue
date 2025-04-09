@@ -1,3 +1,350 @@
+<template>
+  <v-card color="#283593" dark class="rounded-lg timesheet-card">
+    <v-card-title class="d-flex align-center">
+      <v-icon size="small" class="mr-2">mdi-file-document-outline</v-icon>
+      Feuille de temps
+      <v-spacer></v-spacer>
+      <v-btn icon small to="/editTimesheet" class="ml-2">
+        <v-icon>mdi-plus</v-icon>
+        <v-tooltip activator="parent" location="bottom">Nouvelle feuille</v-tooltip>
+      </v-btn>
+    </v-card-title>
+
+    <v-divider></v-divider>
+
+    <!-- Indicateur de chargement -->
+    <div v-if="loading" class="d-flex justify-center align-center my-5">
+      <v-progress-circular indeterminate color="white"></v-progress-circular>
+    </div>
+
+    <!-- Message d'erreur -->
+    <div v-else-if="error" class="pa-4">
+      <v-alert type="error" text dense>{{ error }}</v-alert>
+    </div>
+
+    <!-- Contenu principal -->
+    <template v-else>
+      <!-- Chronomètre -->
+      <div class="d-flex justify-center align-center py-4">
+        <div class="text-h3 font-weight-bold timer">
+          {{ formattedTimerDisplay }}
+        </div>
+
+        <template v-if="!timerRunning">
+          <v-btn
+            icon
+            class="ml-4 play-btn"
+            color="green"
+            :disabled="!selectedTask"
+            @click="startTimer"
+          >
+            <v-icon>mdi-play</v-icon>
+            <v-tooltip activator="parent" location="bottom">Démarrer</v-tooltip>
+          </v-btn>
+        </template>
+
+        <template v-else>
+          <v-btn
+            icon
+            class="ml-4 stop-btn"
+            color="red"
+            @click="stopTimer"
+          >
+            <v-icon>mdi-stop</v-icon>
+            <v-tooltip activator="parent" location="bottom">Arrêter</v-tooltip>
+          </v-btn>
+        </template>
+      </div>
+
+      <!-- Information sur tâche sélectionnée (style intégré) -->
+      <div v-if="selectedTask" class="selected-task-banner mx-4 mb-4">
+        <div class="d-flex align-center">
+          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2" size="small"></v-icon>
+          <span class="font-weight-medium">{{ selectedTimeSheet?.title }}</span>
+          <v-icon class="mx-2" size="small">mdi-chevron-right</v-icon>
+          <span class="task-name">{{ selectedTask.name }}</span>
+        </div>
+      </div>
+
+      <!-- Information sur tâche sélectionnée (fixe en bas d'écran) -->
+      <div v-if="selectedTask" class="task-selection-indicator">
+        <span>Tâche sélectionnée: {{ selectedTask.name }}</span>
+      </div>
+
+      <v-card-text>
+        <!-- Option d'enchaînement automatique -->
+        <div class="auto-chain-option mb-3">
+          <v-checkbox
+            v-model="autoChainTasks"
+            label="Enchaîner automatiquement les tâches"
+            color="white"
+            hide-details
+          >
+            <template v-slot:label>
+              <div @click.stop>Enchaîner automatiquement les tâches</div>
+            </template>
+          </v-checkbox>
+        </div>
+
+        <!-- Sélecteur de groupe -->
+        <v-select
+          v-model="selectedGroup"
+          :items="groupOptions"
+          item-title="title"
+          item-value="value"
+          variant="outlined"
+          density="compact"
+          label="Groupe"
+          bg-color="#1a237e"
+          hide-details
+          class="group-select mb-3"
+        ></v-select>
+
+        <!-- Afficher le label du groupe actuel -->
+        <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
+          <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
+            {{ currentGroupLabel }}
+            <span v-if="filteredTimeSheets.length > 0">- {{ filteredTimeSheets.length }}
+              {{ filteredTimeSheets.length > 1 ? 'feuilles' : 'feuille' }}
+            </span>
+          </span>
+        </div>
+
+        <!-- Liste des feuilles de temps -->
+        <div class="timesheet-container">
+          <template v-if="filteredTimeSheets.length > 0">
+            <v-expansion-panels v-model="expandedPanels" multiple>
+              <v-expansion-panel
+                v-for="(timeSheet, index) in filteredTimeSheets"
+                :key="timeSheet.id"
+                :value="index"
+                bg-color="#1a237e"
+              >
+                <v-expansion-panel-title>
+                  <div class="d-flex align-center">
+                    <v-icon :icon="timeSheet.icon || 'mdi-file-document'" class="mr-2"></v-icon>
+                    <span>{{ timeSheet.title }}</span>
+                    <v-chip class="ml-2" size="small" color="primary">
+                      {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
+                    </v-chip>
+                    <!-- Indicateur pour les feuilles personnelles -->
+                    <v-chip v-if="timeSheet.isPersonal" size="x-small" class="ml-2" color="secondary">
+                      Personnel
+                    </v-chip>
+                  </div>
+                </v-expansion-panel-title>
+
+                <v-expansion-panel-text>
+                  <v-list bg-color="transparent">
+                    <v-list-item
+                      v-for="task in timeSheet.timeSheetTasks"
+                      :key="task.taskId"
+                      :class="{
+                        'selected-task': isTaskSelected(timeSheet.id, task.taskId),
+                        'task-completed': task.completed || task.duration > 0
+                      }"
+                      @click="selectTask(timeSheet, task)"
+                      :disabled="processingTask"
+                    >
+                      <template v-slot:prepend>
+                        <!-- Coche automatiquement la case si la tâche a une durée > 0 -->
+                        <v-checkbox-btn
+                          :model-value="task.completed || task.duration > 0"
+                          color="success"
+                          hide-details
+                          @click.stop="toggleTaskCompleted($event, task, !(task.completed || task.duration > 0))"
+                        ></v-checkbox-btn>
+                      </template>
+
+                      <v-list-item-title
+                        :class="{ 'text-decoration-line-through': task.completed || task.duration > 0 }"
+                      >
+                        {{ task.name }}
+                      </v-list-item-title>
+
+                      <template v-slot:append>
+                        <div class="d-flex align-center">
+                          <span>{{ formatTime(task.duration || 0) }}</span>
+                          <v-btn
+                            icon
+                            size="x-small"
+                            variant="text"
+                            color="grey-lighten-1"
+                            class="ml-2 edit-time-btn"
+                            @click.stop="editTaskTime(timeSheet, task)"
+                          >
+                            <v-icon size="small">mdi-pencil</v-icon>
+                            <v-tooltip activator="parent" location="top">Modifier le temps</v-tooltip>
+                          </v-btn>
+                        </div>
+                      </template>
+                    </v-list-item>
+                  </v-list>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </template>
+
+          <!-- Message si aucune feuille de temps n'est disponible -->
+          <template v-else>
+            <div class="text-center py-8">
+              <v-icon size="large" class="mb-2">mdi-file-document-outline</v-icon>
+              <p>Aucune feuille de temps disponible</p>
+              <v-btn color="primary" to="/editTimesheet" class="mt-3">
+                Créer une feuille de temps
+              </v-btn>
+            </div>
+          </template>
+        </div>
+      </v-card-text>
+    </template>
+
+    <!-- Boîte de dialogue de confirmation du temps -->
+    <v-dialog v-model="showConfirmDialog" max-width="400" persistent>
+      <v-card color="#283593" dark>
+        <v-card-title class="text-h5">
+          <v-icon start class="mr-2">mdi-clock-check-outline</v-icon>
+          Confirmer le temps
+        </v-card-title>
+
+        <v-card-text class="pb-4 pt-4">
+          <p class="mb-2">Tâche: <strong>{{ selectedTask?.name }}</strong></p>
+          <p class="mb-4">Confirmez ou ajustez le temps passé sur cette tâche :</p>
+
+          <div class="time-display text-center mb-6">
+            <div class="text-h2 font-weight-bold">
+              {{ hours.toString().padStart(2, '0') }}:{{ minutes.toString().padStart(2, '0') }}:{{ seconds.toString().padStart(2, '0') }}
+            </div>
+            <div class="text-caption">Heures:Minutes:Secondes</div>
+          </div>
+
+          <v-row>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="hours"
+                label="Heures"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="minutes"
+                label="Minutes"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                max="59"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="seconds"
+                label="Secondes"
+                type="number"
+                variant="outlined"
+                bg-color="#1a237e"
+                min="0"
+                max="59"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </v-card-text>
+
+        <v-divider></v-divider>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="cancelConfirmation">
+            Annuler
+          </v-btn>
+          <v-btn color="primary" @click="saveConfirmedTime" :disabled="confirmedSeconds <= 0">
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Notification asynchrone et non bloquante -->
+    <transition name="fade">
+      <div v-if="statusMessage" class="success-notification">
+        <v-icon class="mr-2" color="white">mdi-check-circle</v-icon>
+        {{ statusMessage }}
+      </div>
+    </transition>
+
+    <!-- Dialogue de confirmation pour réinitialiser le temps -->
+    <v-dialog v-model="resetTimeDialog" max-width="400" persistent>
+      <v-card color="#283593" dark>
+        <v-card-title class="headline">
+          <v-icon start class="mr-2">mdi-timer-off</v-icon>
+          Réinitialiser le temps
+        </v-card-title>
+
+        <v-card-text>
+          <p>Voulez-vous réinitialiser le temps passé sur cette tâche ?</p>
+          <p class="text-subtitle-2 mt-2" v-if="taskToReset">
+            <strong>{{ taskToReset.name }}</strong> - Temps actuel: {{ formatTime(taskToReset.duration) }}
+          </p>
+          <p class="text-caption mt-3">
+            <v-icon size="small" color="warning" class="mr-1">mdi-alert-circle</v-icon>
+            Cette action ne peut pas être annulée.
+          </p>
+        </v-card-text>
+
+        <v-divider></v-divider>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="cancelResetTime">
+            Annuler
+          </v-btn>
+          <v-btn color="error" @click="confirmResetTime">
+            Réinitialiser
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialogue d'avertissement pour tâche sans temps -->
+    <v-dialog v-model="noTimeDialog" max-width="400">
+      <v-card color="#283593" dark>
+        <v-card-title class="headline">
+          <v-icon start class="mr-2" color="warning">mdi-alert-circle</v-icon>
+          Aucun temps enregistré
+        </v-card-title>
+
+        <v-card-text>
+          <p>Cette tâche n'a pas de temps enregistré.</p>
+          <p class="mt-2">Vous devez d'abord enregistrer du temps avec le chronomètre ou éditer manuellement la durée pour pouvoir la marquer comme complétée.</p>
+          <p class="text-subtitle-2 mt-3" v-if="taskToToggle">
+            <strong>{{ taskToToggle.name }}</strong>
+          </p>
+        </v-card-text>
+
+        <v-divider></v-divider>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="closeNoTimeDialog">
+            Fermer
+          </v-btn>
+          <v-btn color="primary" @click="editTaskTimeFromDialog">
+            <v-icon start class="mr-1">mdi-pencil</v-icon>
+            Éditer le temps
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-card>
+</template>
+
 <script setup>
 import { ref, watch, onMounted, computed, onUnmounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
@@ -38,6 +385,12 @@ const confirmedSeconds = ref(0);
 const hours = ref(0);
 const minutes = ref(0);
 const seconds = ref(0);
+
+// Variables pour les dialogues
+const resetTimeDialog = ref(false);
+const noTimeDialog = ref(false);
+const taskToReset = ref(null);
+const taskToToggle = ref(null);
 
 const emit = defineEmits(['task-updated', 'data-changed']);
 
@@ -393,7 +746,7 @@ const saveConfirmedTime = async () => {
   }
 };
 
-const refreshData = async () => {
+const refreshData = async (silent = false) => {
   await loadTimeSheets();
   emit('data-changed');
 };
@@ -413,6 +766,131 @@ const cancelConfirmation = () => {
   seconds.value = 0;
 };
 
+// Fonction pour modifier la tâche
+const toggleTaskCompleted = async (event, task, completed) => {
+  // Arrêter la propagation pour ne pas interférer avec la sélection
+  event.stopPropagation();
+
+  try {
+    if (completed) {
+      // Cas où l'utilisateur veut cocher la tâche
+      if (task.duration <= 0) {
+        // Si la tâche n'a pas de temps, montrer un dialogue d'avertissement
+        taskToToggle.value = task;
+        noTimeDialog.value = true;
+        return; // Arrêter l'exécution de la fonction
+      }
+
+      // Sinon, si la tâche a déjà du temps, la marquer comme complétée
+      task.completed = true;
+    } else {
+      // Cas où l'utilisateur veut décocher la tâche
+      if (task.duration > 0) {
+        // Si la tâche a du temps, demander confirmation pour réinitialiser
+        taskToReset.value = task;
+        resetTimeDialog.value = true;
+        return; // Arrêter l'exécution de la fonction
+      }
+
+      // Sinon, simplement décocher
+      task.completed = false;
+    }
+
+    // Mettre à jour l'interface
+    emit('task-updated', {
+      timeSheetId: selectedTimeSheet.value.id,
+      taskId: task.taskId,
+      duration: task.duration,
+      completed: task.completed
+    });
+
+    // Notifier que les données ont changé
+    emit('data-changed');
+
+    // Recharger les données
+    await refreshData(true);
+  } catch (err) {
+    console.error('Erreur lors de la mise à jour de l\'état de la tâche:', err);
+    error.value = 'Erreur lors de la mise à jour de l\'état de la tâche';
+  }
+};
+
+// Fonction pour confirmer la réinitialisation du temps d'une tâche
+const confirmResetTime = async () => {
+  try {
+    // Réinitialiser le temps et décocher la tâche
+    taskToReset.value.duration = 0;
+    taskToReset.value.completed = false;
+
+    // Mettre à jour la durée sur le serveur
+    await timeSheetService.updateTaskDuration(
+      selectedTimeSheet.value.id,
+      taskToReset.value.taskId,
+      0
+    );
+
+    // Mettre à jour l'interface
+    emit('task-updated', {
+      timeSheetId: selectedTimeSheet.value.id,
+      taskId: taskToReset.value.taskId,
+      duration: 0,
+      completed: false
+    });
+
+    // Notifier que les données ont changé
+    emit('data-changed');
+
+    // Recharger les données
+    await refreshData(true);
+
+    // Fermer le dialogue
+    resetTimeDialog.value = false;
+    taskToReset.value = null;
+  } catch (err) {
+    console.error('Erreur lors de la réinitialisation du temps:', err);
+    error.value = 'Erreur lors de la réinitialisation du temps';
+  }
+};
+
+// Fonction pour annuler la réinitialisation
+const cancelResetTime = () => {
+  // Restaurer l'état coché de la tâche car l'utilisateur a annulé l'action
+  if (taskToReset.value) {
+    // Régler la propriété "completed" à true manuellement puisque la case doit rester cochée
+    // car la tâche a toujours du temps enregistré
+    taskToReset.value.completed = true;
+
+    // Forcer une mise à jour du DOM
+    nextTick(() => {
+      // Émettre un événement pour mettre à jour l'interface
+      emit('task-updated', {
+        timeSheetId: selectedTimeSheet.value.id,
+        taskId: taskToReset.value.taskId,
+        duration: taskToReset.value.duration,
+        completed: true
+      });
+    });
+  }
+
+  // Fermer la boîte de dialogue et réinitialiser la référence à la tâche
+  resetTimeDialog.value = false;
+  taskToReset.value = null;
+};
+
+// Fonction pour fermer le dialogue "pas de temps"
+const closeNoTimeDialog = () => {
+  noTimeDialog.value = false;
+  taskToToggle.value = null;
+};
+
+// Fonction pour ouvrir l'éditeur de temps à partir du dialogue
+const editTaskTimeFromDialog = () => {
+  if (taskToToggle.value) {
+    editTaskTime(selectedTimeSheet.value, taskToToggle.value);
+    closeNoTimeDialog();
+  }
+};
+
 // Sauvegarde le temps passé sur une tâche
 const saveTaskTime = async (task, additionalMinutes) => {
   if (!task || !task.taskId || !selectedTimeSheet.value?.id) return;
@@ -430,19 +908,7 @@ const saveTaskTime = async (task, additionalMinutes) => {
   await loadTimeSheets();
 };
 
-// Marque explicitement une tâche comme complétée ou non
-const toggleTaskCompleted = (event, task, completed) => {
-  // Arrêter la propagation pour ne pas interférer avec la sélection
-  event.stopPropagation();
-
-  // Ce clic est indépendant de la sélection de tâche pour chronométrage
-  task.completed = completed;
-
-  // On pourrait avoir une API dédiée pour mettre à jour le statut, si elle existe
-  // Pour l'instant, on simule localement ce comportement
-  console.log(`Tâche "${task.name}" marquée comme ${completed ? 'complétée' : 'non complétée'}`);
-};
-
+// Éditer le temps d'une tâche
 const editTaskTime = (timeSheet, task) => {
   event.stopPropagation(); // Empêcher la sélection de la tâche
 
@@ -478,7 +944,6 @@ const moveToNextTask = () => {
   }, 0);
 };
 
-
 const formatTime = (timeValue) => {
   if (timeValue === null || timeValue === undefined) return '00:00:00';
 
@@ -490,15 +955,6 @@ const formatTime = (timeValue) => {
   const secs = totalSeconds % 60;
 
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-};
-
-// Formatage du temps complet (secondes -> HH:MM:SS)
-const formatTimeWithSeconds = (totalSeconds) => {
-  if (!totalSeconds) return '00:00:00';
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
 // Nettoyer l'intervalle du chronomètre lors du démontage du composant
@@ -536,290 +992,6 @@ watch([hours, minutes, seconds], () => {
   updateTotalSeconds();
 });
 </script>
-
-<template>
-  <v-card color="#283593" dark class="rounded-lg timesheet-card">
-    <v-card-title class="d-flex align-center">
-      <v-icon size="small" class="mr-2">mdi-file-document-outline</v-icon>
-      Feuille de temps
-      <v-spacer></v-spacer>
-      <v-btn icon small to="/editTimesheet" class="ml-2">
-        <v-icon>mdi-plus</v-icon>
-        <v-tooltip activator="parent" location="bottom">Nouvelle feuille</v-tooltip>
-      </v-btn>
-    </v-card-title>
-
-    <v-divider></v-divider>
-
-    <!-- Indicateur de chargement -->
-    <div v-if="loading" class="d-flex justify-center align-center my-5">
-      <v-progress-circular indeterminate color="white"></v-progress-circular>
-    </div>
-
-    <!-- Message d'erreur -->
-    <div v-else-if="error" class="pa-4">
-      <v-alert type="error" text dense>{{ error }}</v-alert>
-    </div>
-
-    <!-- Contenu principal -->
-    <template v-else>
-      <!-- Chronomètre -->
-      <div class="d-flex justify-center align-center py-4">
-        <div class="text-h3 font-weight-bold timer">
-          {{ formattedTimerDisplay }}
-        </div>
-
-        <template v-if="!timerRunning">
-          <v-btn
-            icon
-            class="ml-4 play-btn"
-            color="green"
-            :disabled="!selectedTask"
-            @click="startTimer"
-          >
-            <v-icon>mdi-play</v-icon>
-            <v-tooltip activator="parent" location="bottom">Démarrer</v-tooltip>
-          </v-btn>
-        </template>
-
-        <template v-else>
-          <v-btn
-            icon
-            class="ml-4 stop-btn"
-            color="red"
-            @click="stopTimer"
-          >
-            <v-icon>mdi-stop</v-icon>
-            <v-tooltip activator="parent" location="bottom">Arrêter</v-tooltip>
-          </v-btn>
-        </template>
-      </div>
-
-      <!-- Information sur tâche sélectionnée (style intégré) -->
-      <div v-if="selectedTask" class="selected-task-banner mx-4 mb-4">
-        <div class="d-flex align-center">
-          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2" size="small"></v-icon>
-          <span class="font-weight-medium">{{ selectedTimeSheet?.title }}</span>
-          <v-icon class="mx-2" size="small">mdi-chevron-right</v-icon>
-          <span class="task-name">{{ selectedTask.name }}</span>
-        </div>
-      </div>
-
-      <!-- Information sur tâche sélectionnée (fixe en bas d'écran) -->
-      <div v-if="selectedTask" class="task-selection-indicator">
-        <span>Tâche sélectionnée: {{ selectedTask.name }}</span>
-      </div>
-
-      <v-card-text>
-        <!-- Option d'enchaînement automatique -->
-        <div class="auto-chain-option mb-3">
-          <v-checkbox
-            v-model="autoChainTasks"
-            label="Enchaîner automatiquement les tâches"
-            color="white"
-            hide-details
-          >
-            <template v-slot:label>
-              <div @click.stop>Enchaîner automatiquement les tâches</div>
-            </template>
-          </v-checkbox>
-        </div>
-
-        <!-- Sélecteur de groupe -->
-        <v-select
-          v-model="selectedGroup"
-          :items="groupOptions"
-          item-title="title"
-          item-value="value"
-          variant="outlined"
-          density="compact"
-          label="Groupe"
-          bg-color="#1a237e"
-          hide-details
-          class="group-select mb-3"
-        ></v-select>
-
-        <!-- Afficher le label du groupe actuel -->
-        <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
-          <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
-            {{ currentGroupLabel }}
-            <span v-if="filteredTimeSheets.length > 0">- {{ filteredTimeSheets.length }}
-              {{ filteredTimeSheets.length > 1 ? 'feuilles' : 'feuille' }}
-            </span>
-          </span>
-        </div>
-
-        <!-- Liste des feuilles de temps -->
-        <div class="timesheet-container">
-          <template v-if="filteredTimeSheets.length > 0">
-            <v-expansion-panels v-model="expandedPanels" multiple>
-              <v-expansion-panel
-                v-for="(timeSheet, index) in filteredTimeSheets"
-                :key="timeSheet.id"
-                :value="index"
-                bg-color="#1a237e"
-              >
-                <v-expansion-panel-title>
-                  <div class="d-flex align-center">
-                    <v-icon :icon="timeSheet.icon || 'mdi-file-document'" class="mr-2"></v-icon>
-                    <span>{{ timeSheet.title }}</span>
-                    <v-chip class="ml-2" size="small" color="primary">
-                      {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
-                    </v-chip>
-                    <!-- Indicateur pour les feuilles personnelles -->
-                    <v-chip v-if="timeSheet.isPersonal" size="x-small" class="ml-2" color="secondary">
-                      Personnel
-                    </v-chip>
-                  </div>
-                </v-expansion-panel-title>
-
-                <v-expansion-panel-text>
-                  <v-list bg-color="transparent">
-                    <v-list-item
-                      v-for="task in timeSheet.timeSheetTasks"
-                      :key="task.taskId"
-                      :class="{
-                        'selected-task': isTaskSelected(timeSheet.id, task.taskId),
-                        'task-completed': task.completed
-                      }"
-                      @click="selectTask(timeSheet, task)"
-                      :disabled="processingTask"
-                    >
-                      <template v-slot:prepend>
-                        <!-- La case à cocher pour marquer comme complété/non complété -->
-                        <v-checkbox-btn
-                          :model-value="task.completed"
-                          color="white"
-                          hide-details
-                          @click="(e) => toggleTaskCompleted(e, task, !task.completed)"
-                        ></v-checkbox-btn>
-                      </template>
-
-                      <v-list-item-title
-                        :class="{ 'text-decoration-line-through': task.completed }"
-                      >
-                        {{ task.name }}
-                      </v-list-item-title>
-
-                      <template v-slot:append>
-                        <div class="d-flex align-center">
-                          <span>{{ formatTime(task.duration || 0) }}</span>
-                          <!-- Nouveau bouton modifer -->
-                          <v-btn
-                            icon
-                            size="x-small"
-                            variant="text"
-                            color="grey-lighten-1"
-                            class="ml-2 edit-time-btn"
-                            @click.stop="editTaskTime(timeSheet, task)"
-                          >
-                            <v-icon size="small">mdi-pencil</v-icon>
-                            <v-tooltip activator="parent" location="top">Modifier le temps</v-tooltip>
-                          </v-btn>
-                        </div>
-                      </template>
-                    </v-list-item>
-                  </v-list>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
-          </template>
-
-          <!-- Message si aucune feuille de temps n'est disponible -->
-          <template v-else>
-            <div class="text-center py-8">
-              <v-icon size="large" class="mb-2">mdi-file-document-outline</v-icon>
-              <p>Aucune feuille de temps disponible</p>
-              <v-btn color="primary" to="/editTimesheet" class="mt-3">
-                Créer une feuille de temps
-              </v-btn>
-            </div>
-          </template>
-        </div>
-      </v-card-text>
-    </template>
-
-    <!-- Boîte de dialogue de confirmation du temps -->
-    <v-dialog v-model="showConfirmDialog" max-width="400" persistent>
-      <v-card color="#283593" dark>
-        <v-card-title class="text-h5">
-          <v-icon start class="mr-2">mdi-clock-check-outline</v-icon>
-          Confirmer le temps
-        </v-card-title>
-
-        <v-card-text class="pb-4 pt-4">
-          <p class="mb-2">Tâche: <strong>{{ selectedTask?.name }}</strong></p>
-          <p class="mb-4">Confirmez ou ajustez le temps passé sur cette tâche :</p>
-
-          <div class="time-display text-center mb-6">
-            <div class="text-h2 font-weight-bold">
-              {{ hours.toString().padStart(2, '0') }}:{{ minutes.toString().padStart(2, '0') }}:{{ seconds.toString().padStart(2, '0') }}
-            </div>
-            <div class="text-caption">Heures:Minutes:Secondes</div>
-          </div>
-
-          <v-row>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="hours"
-                label="Heures"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="minutes"
-                label="Minutes"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                max="59"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="seconds"
-                label="Secondes"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                max="59"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-          </v-row>
-        </v-card-text>
-
-        <v-divider></v-divider>
-
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="cancelConfirmation">
-            Annuler
-          </v-btn>
-          <v-btn color="primary" @click="saveConfirmedTime" :disabled="confirmedSeconds <= 0">
-            Enregistrer
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Notification asynchrone et non bloquante -->
-    <transition name="fade">
-      <div v-if="statusMessage" class="success-notification">
-        <v-icon class="mr-2" color="white">mdi-check-circle</v-icon>
-        {{ statusMessage }}
-      </div>
-    </transition>
-  </v-card>
-</template>
 
 <style scoped>
 .timesheet-card {
@@ -861,8 +1033,28 @@ watch([hours, minutes, seconds], () => {
   color: #fafafa;
 }
 
+/* Style pour les tâches complétées */
 .task-completed {
+  background-color: rgba(76, 175, 80, 0.1) !important; /* Fond vert transparent */
+  transition: background-color 0.3s ease;
+}
+
+.task-completed:hover {
+  background-color: rgba(76, 175, 80, 0.2) !important;
+}
+
+.task-completed .v-list-item-title {
   opacity: 0.7;
+}
+
+/* S'assurer que la tâche sélectionnée a priorité sur la tâche complétée pour l'affichage */
+.selected-task.task-completed {
+  background-color: rgba(156, 39, 176, 0.3) !important;
+  border-left: 3px solid #e040fb;
+}
+
+.selected-task.task-completed:hover {
+  background-color: rgba(156, 39, 176, 0.4) !important;
 }
 
 :deep(.v-expansion-panel-text__wrapper) {
@@ -963,5 +1155,14 @@ watch([hours, minutes, seconds], () => {
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* Amélioration du style de la case à cocher */
+:deep(.v-checkbox-btn) {
+  margin-right: 8px;
+}
+
+:deep(.v-checkbox-btn--selected .v-selection-control__input) {
+  color: #4CAF50 !important;
 }
 </style>

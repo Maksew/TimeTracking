@@ -314,6 +314,25 @@ public class TimeSheetService {
     }
 
     /**
+     * Met à jour l'état "complété" d'une tâche dans une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param taskId ID de la tâche
+     * @param completed Nouvel état "complété"
+     * @return Tâche mise à jour
+     */
+    public TimeSheetTask updateTaskCompletionState(Integer timeSheetId, Integer taskId, Boolean completed) {
+        TimeSheetTaskId id = new TimeSheetTaskId(taskId, timeSheetId);
+
+        TimeSheetTask timeSheetTask = timeSheetTaskRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Association tâche-feuille introuvable"));
+
+        // Mettre à jour l'état "complété"
+        timeSheetTask.setCompleted(completed);
+
+        return timeSheetTaskRepository.save(timeSheetTask);
+    }
+
+    /**
      * Supprime une tâche d'une feuille de temps
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche

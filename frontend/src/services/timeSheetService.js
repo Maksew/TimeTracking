@@ -88,6 +88,14 @@ export default {
     })
   },
 
+  updateTaskCompletionState(timeSheetId, taskId, completed) {
+    return doAjaxRequestWithAuth(`/api/timesheets/${timeSheetId}/tasks/${taskId}/complete`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed })
+    })
+  },
+
   // Exporter les feuilles de temps au format CSV
   exportTimeSheetsToCsv(startDate, endDate) {
     let url = '/api/timesheets/export/csv';

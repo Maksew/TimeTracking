@@ -15,12 +15,22 @@ const refreshInterval = ref(null);
 // Compteurs calculés
 const tasksToDo = computed(() => {
   if (!statistics.value) return 0;
-  return statistics.value.summary ?
-    (statistics.value.summary.totalTasks - statistics.value.summary.completedTasks) : 0;
+
+  if (statistics.value.summary) {
+    // Compter les tâches qui n'ont ni durée > 0 ni ne sont explicitement marquées comme complétées
+    const totalTasks = statistics.value.summary.totalTasks || 0;
+    const completedTasks = statistics.value.summary.completedTasks || 0;
+
+    return totalTasks - completedTasks;
+  }
+  return 0;
 });
 
 const tasksCompleted = computed(() => {
   if (!statistics.value) return 0;
+
+  // Une tâche est considérée comme complétée si elle a une durée > 0
+  // OU si elle est explicitement marquée comme complétée
   return statistics.value.summary ? statistics.value.summary.completedTasks : 0;
 });
 
