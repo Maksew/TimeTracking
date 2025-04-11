@@ -2,6 +2,7 @@ package isis.projet.backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import isis.projet.backend.security.converter.AttributeEncryptor;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class TimeSheet {
     private String icon;
 
     @Column(name = "title", length = 100)
+    @Convert(converter = AttributeEncryptor.class)   // Encrypt this sensitive field
     private String title;
 
     @Column(name = "start_date")
@@ -45,17 +47,15 @@ public class TimeSheet {
     @JsonBackReference("user-timesheets")
     private User user;
 
-    // Relation inverse avec TIME_SHEET_TASK (pas dans le SQL mais utile pour JPA)
+    // Other relationships remain the same...
     @OneToMany(mappedBy = "timeSheet")
     @JsonManagedReference("timesheet-tasks")
     private List<TimeSheetTask> timeSheetTasks = new ArrayList<>();
 
-    // Relation inverse avec TIME_SHEET_SHARE_USER
     @OneToMany(mappedBy = "timeSheet")
     @JsonManagedReference("timesheet-sharedusers")
     private List<TimeSheetShareUser> sharedWithUsers = new ArrayList<>();
 
-    // Relation inverse avec TIME_SHEET_SHARE_GROUP
     @OneToMany(mappedBy = "timeSheet")
     @JsonManagedReference("timesheet-sharedgroups")
     private List<TimeSheetShareGroup> sharedWithGroups = new ArrayList<>();
