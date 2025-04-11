@@ -118,12 +118,15 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
 .dashboard {
   background-color: #1a237e;
   min-height: calc(100vh - 64px); /* Hauteur totale moins la barre de navigation */
   padding: 0;
   /* Ajouter un padding-top pour créer de l'espace sous la barre de navigation */
   padding-top: 24px;
+  display: flex;
+  flex-direction: column;
 }
 
 .date-header {
@@ -137,14 +140,14 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+
 .dashboard-container {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr);
   gap: 16px;
   padding: 0 16px 16px 16px;
-  height: calc(100vh - 180px); /* Ajuster cette valeur pour laisser plus d'espace */
-  /* Ajouter une marge en haut pour séparer du header de date */
-  margin-top: 16px;
+  flex: 1;
+  overflow: hidden; /* Empêche le défilement de l'ensemble du dashboard */
 }
 
 /* En dessous de 960px, passer en une seule colonne */
@@ -152,21 +155,26 @@ onMounted(() => {
   .dashboard-container {
     grid-template-columns: 1fr;
     gap: 16px;
-    height: auto;
+    overflow-y: auto; /* Permettre le défilement vertical sur petits écrans */
   }
 
   .dashboard-left, .dashboard-right {
     width: 100%;
+    overflow: visible; /* Réinitialiser les propriétés de défilement sur petits écrans */
   }
 }
 
 .dashboard-left {
   display: flex;
   flex-direction: column;
+  overflow-y: auto; /* Permettre le défilement de la colonne gauche si nécessaire */
 }
 
 .dashboard-right {
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Empêcher le défilement de la colonne droite au niveau container */
+  height: 100%; /* Assurer que la colonne prend toute la hauteur disponible */
 }
+
 </style>
