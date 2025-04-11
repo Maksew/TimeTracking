@@ -1,6 +1,7 @@
 package isis.projet.backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import isis.projet.backend.security.converter.AttributeEncryptor;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.*;
@@ -19,9 +20,11 @@ public class User {
     private Integer id;
 
     @Column(name = "pseudo", nullable = false)
+    @Convert(converter = AttributeEncryptor.class)  // Field will be automatically encrypted/decrypted
     private String pseudo;
 
     @Column(name = "email", unique = true, nullable = false)
+    @Convert(converter = AttributeEncryptor.class)  // Field will be automatically encrypted/decrypted
     private String email;
 
     @Column(name = "password", nullable = false)
@@ -35,17 +38,15 @@ public class User {
     @JsonManagedReference("user-usergroups")
     private List<UserGroup> userGroups = new ArrayList<>();
 
-    // Relation inverse avec TIME_SHEET
+    // ... other relationships and fields remain the same
     @OneToMany(mappedBy = "user")
     @JsonManagedReference("user-timesheets")
     private List<TimeSheet> timeSheets = new ArrayList<>();
 
-    // Relation inverse avec TIME_SHEET_SHARE_USER
     @OneToMany(mappedBy = "user")
     @JsonManagedReference("user-sharedtimesheets")
     private List<TimeSheetShareUser> sharedTimeSheets = new ArrayList<>();
 
-    // Relation inverse avec INVITATION (comme expéditeur)
     @OneToMany(mappedBy = "sender")
     @JsonManagedReference("user-sentinvitations")
     private List<Invitation> sentInvitations = new ArrayList<>();
