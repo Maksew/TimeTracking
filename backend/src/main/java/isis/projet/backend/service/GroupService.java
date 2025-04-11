@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class GroupService {
@@ -46,14 +48,37 @@ public class GroupService {
     public void loadGroupMembersDetails(Group group) {
         if (group == null || group.getUserGroups() == null) return;
 
+        // Récupérer tous les IDs d'utilisateurs dans le groupe en une seule liste
+        List<Integer> userIds = group.getUserGroups().stream()
+                .map(UserGroup::getUserId)
+                .collect(Collectors.toList());
+
+        // Récupérer tous les utilisateurs en une seule requête
+        List<User> users = userRepository.findAllByIdIn(userIds);
+
+        // Créer une map pour un accès rapide
+        Map<Integer, User> userMap = users.stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
+
+        // Associer les objets User complets aux UserGroup
         for (UserGroup userGroup : group.getUserGroups()) {
-            // Si l'utilisateur n'est pas complètement chargé
-            if (userGroup.getUser() == null || userGroup.getUser().getPseudo() == null) {
-                // Récupérer les détails complets de l'utilisateur
-                Optional<User> fullUser = userRepository.findById(userGroup.getUserId());
-                // Mettre à jour l'association
-                fullUser.ifPresent(userGroup::setUser);
+            User user = userMap.get(userGroup.getUserId());
+            if (user != null) {
+                userGroup.setUser(user);
             }
+        }
+
+        // S'assurer que la liste UserGroups est initialisée et non vide
+        if (group.getUserGroups().isEmpty()) {
+            // Récupérer directement de la base de données si la liste est vide
+            List<UserGroup> userGroups = userGroupRepository.findByGroupId(group.getId());
+            for (UserGroup ug : userGroups) {
+                User user = userMap.get(ug.getUserId());
+                if (user != null) {
+                    ug.setUser(user);
+                }
+            }
+            group.setUserGroups(userGroups);
         }
     }
 

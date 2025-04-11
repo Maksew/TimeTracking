@@ -87,12 +87,18 @@ function filterAndSortGroups(groups) {
 const loadGroupMembers = async (group) => {
   if (!group || !group.userGroups) return;
 
+  console.log('Chargement des membres pour le groupe:', group.name);
+  console.log('UserGroups actuels:', group.userGroups);
+
   // Pour chaque UserGroup qui n'a pas d'information utilisateur complète
   for (const userGroup of group.userGroups) {
     if (!userGroup.user || !userGroup.user.pseudo) {
       try {
         // Charger les détails de l'utilisateur
+        console.log('Chargement des détails pour l\'utilisateur:', userGroup.userId);
         const userData = await groupService.getGroupMemberDetails(userGroup.userId);
+        console.log('Données utilisateur récupérées:', userData);
+
         // Mettre à jour l'objet userGroup avec les données complètes
         userGroup.user = userData;
       } catch (err) {
@@ -105,27 +111,28 @@ const loadGroupMembers = async (group) => {
 onMounted(async () => {
   try {
     const groups = await groupService.getUserGroups();
+    console.log('Groupes récupérés:', groups);
 
     // Séparer les groupes dont je suis propriétaire des autres
     myGroups.value = groups.filter(group => {
-      const userGroup = group.userGroups.find(ug => ug.userId === authStore.user.id);
+      const userGroup = group.userGroups?.find(ug => ug.userId === authStore.user.id);
       return userGroup && userGroup.role === 'OWNER';
     });
 
     joinedGroups.value = groups.filter(group => {
-      const userGroup = group.userGroups.find(ug => ug.userId === authStore.user.id);
+      const userGroup = group.userGroups?.find(ug => ug.userId === authStore.user.id);
       return userGroup && userGroup.role !== 'OWNER';
     });
-
-    // Si aucun groupe créé mais des groupes rejoints, activer l'onglet "Groupes rejoints"
-    if (myGroups.value.length === 0 && joinedGroups.value.length > 0) {
-      activeTab.value = 1;
-    }
 
     // Précharger les détails des membres pour tous les groupes
     for (const group of [...myGroups.value, ...joinedGroups.value]) {
       await loadGroupMembers(group);
     }
+
+    // Force le rafraîchissement de l'interface après chargement complet
+    myGroups.value = [...myGroups.value];
+    joinedGroups.value = [...joinedGroups.value];
+
   } catch (err) {
     console.error('Erreur lors du chargement des groupes:', err);
     error.value = 'Erreur lors du chargement des groupes.';
@@ -158,10 +165,16 @@ const createGroup = async () => {
 };
 
 const getCorrectMemberCount = (group) => {
-  if (!group || !group.userGroups || group.userGroups.length === 0) {
-    return 1;
+  console.log('Comptage des membres pour le groupe:', group?.name);
+  console.log('userGroups:', group?.userGroups);
+
+  // Si userGroups existe et est un tableau, retourner sa longueur
+  if (group && Array.isArray(group.userGroups)) {
+    return group.userGroups.length;
   }
-  return group.userGroups.length;
+
+  // Valeur par défaut
+  return 1;
 }
 
 const joinGroup = async () => {
