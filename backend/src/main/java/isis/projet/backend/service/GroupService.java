@@ -10,10 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,45 +37,61 @@ public class GroupService {
         return groupRepository.findByUserId(userId);
     }
 
+
     /**
      * Charge les détails complets des membres d'un groupe
      * Cette méthode s'assure que chaque UserGroup a un objet User complet avec toutes ses propriétés
      * @param group Le groupe dont on veut charger les membres
      */
     public void loadGroupMembersDetails(Group group) {
-        if (group == null || group.getUserGroups() == null) return;
+        if (group == null) return;
 
-        // Récupérer tous les IDs d'utilisateurs dans le groupe en une seule liste
-        List<Integer> userIds = group.getUserGroups().stream()
-                .map(UserGroup::getUserId)
-                .collect(Collectors.toList());
+        try {
+            // Utiliser la requête JPQL personnalisée pour charger le groupe avec tous ses membres en une seule opération
+            Optional<Group> fullGroupOpt = groupRepository.findByIdWithAllMembers(group.getId());
 
-        // Récupérer tous les utilisateurs en une seule requête
-        List<User> users = userRepository.findAllByIdIn(userIds);
+            if (fullGroupOpt.isEmpty()) return;
 
-        // Créer une map pour un accès rapide
-        Map<Integer, User> userMap = users.stream()
-                .collect(Collectors.toMap(User::getId, user -> user));
+            Group fullGroup = fullGroupOpt.get();
 
-        // Associer les objets User complets aux UserGroup
-        for (UserGroup userGroup : group.getUserGroups()) {
-            User user = userMap.get(userGroup.getUserId());
-            if (user != null) {
-                userGroup.setUser(user);
+            // Remplacer la liste userGroups du groupe par celle du groupe complet
+            group.setUserGroups(fullGroup.getUserGroups());
+
+            // Vérifier si le nombre de membres correspond à celui attendu
+            long expectedCount = groupRepository.countMembersByGroupId(group.getId());
+            int actualCount = group.getUserGroups() != null ? group.getUserGroups().size() : 0;
+
+            if (expectedCount != actualCount) {
+                System.out.println("Attention: Décalage dans le nombre de membres pour le groupe " + group.getName() +
+                        ". Attendu: " + expectedCount + ", Actuel: " + actualCount);
             }
-        }
 
-        // S'assurer que la liste UserGroups est initialisée et non vide
-        if (group.getUserGroups().isEmpty()) {
-            // Récupérer directement de la base de données si la liste est vide
-            List<UserGroup> userGroups = userGroupRepository.findByGroupId(group.getId());
-            for (UserGroup ug : userGroups) {
-                User user = userMap.get(ug.getUserId());
-                if (user != null) {
-                    ug.setUser(user);
+            // Si userGroups est vide ou null, on a un problème
+            if (group.getUserGroups() == null || group.getUserGroups().isEmpty()) {
+                System.out.println("Aucun membre trouvé pour le groupe " + group.getName() +
+                        ". Tentative de récupération alternative...");
+
+                // Récupération alternative des UserGroup
+                List<UserGroup> allUserGroups = userGroupRepository.findByGroupId(group.getId());
+                group.setUserGroups(allUserGroups);
+            }
+
+            // Maintenant qu'on a les UserGroup, charger les détails des utilisateurs si nécessaire
+            if (group.getUserGroups() != null) {
+                for (UserGroup userGroup : group.getUserGroups()) {
+                    if (userGroup.getUser() == null) {
+                        Optional<User> userOpt = userRepository.findById(userGroup.getUserId());
+                        userOpt.ifPresent(userGroup::setUser);
+                    }
                 }
             }
-            group.setUserGroups(userGroups);
+
+            System.out.println("Groupe " + group.getName() + " chargé avec " +
+                    (group.getUserGroups() != null ? group.getUserGroups().size() : 0) + " membres");
+
+        } catch (Exception e) {
+            System.err.println("Erreur lors du chargement des membres du groupe: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

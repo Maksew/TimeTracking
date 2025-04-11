@@ -13,11 +13,12 @@ import java.util.Optional;
 public interface GroupRepository extends JpaRepository<Group, Integer> {
     Optional<Group> findByInvitCode(String invitCode);
 
-    // Assurez-vous que cette requête JPQL récupère tous les groupes, y compris leurs userGroups
-    @Query("SELECT DISTINCT g FROM Group g LEFT JOIN FETCH g.userGroups ug WHERE ug.user.id = :userId")
+    @Query("SELECT DISTINCT g FROM Group g JOIN g.userGroups ug WHERE ug.user.id = :userId")
     List<Group> findByUserId(@Param("userId") Integer userId);
 
-    // Vous pourriez aussi ajouter cette méthode pour le comptage explicite
     @Query("SELECT COUNT(ug) FROM UserGroup ug WHERE ug.groupId = :groupId")
     long countMembersByGroupId(@Param("groupId") Integer groupId);
+
+    @Query("SELECT g FROM Group g LEFT JOIN FETCH g.userGroups WHERE g.id = :groupId")
+    Optional<Group> findByIdWithAllMembers(@Param("groupId") Integer groupId);
 }
