@@ -1,54 +1,212 @@
+<template>
+  <v-container fluid class="py-6 px-6" style="background-color: #2C2C5E;">
+    <!-- Main Card -->
+    <v-card
+      class="mx-auto pa-4"
+      max-width="800"
+      elevation="3"
+      style="background-color: rgb(40, 53, 147); color: #FFF; caret-color: #FFF;"
+    >
+      <!-- Headers avec actions -->
+      <v-card-item>
+        <template v-slot:prepend>
+          <v-btn icon variant="text" @click="goBack">
+            <v-icon>mdi-arrow-left</v-icon>
+          </v-btn>
+        </template>
+
+        <v-card-title class="text-h5">
+          <v-icon left class="mr-2">mdi-file-document-edit</v-icon>
+          {{ isEditing ? 'Modifier la feuille de temps' : 'Nouvelle feuille de temps' }}
+        </v-card-title>
+      </v-card-item>
+
+      <v-divider class="mb-4"></v-divider>
+
+      <v-card-text>
+        <!-- Alertes -->
+        <v-alert v-if="errorMessage" type="error" class="mb-4" closable>
+          {{ errorMessage }}
+        </v-alert>
+
+        <v-alert v-if="successMessage" type="success" class="mb-4" closable>
+          {{ successMessage }}
+        </v-alert>
+
+        <!-- Title Field -->
+        <v-text-field
+          v-model="titre"
+          label="Titre de la feuille de temps"
+          placeholder="Saisissez votre titre..."
+          variant="outlined"
+          class="mb-4"
+          hide-details="auto"
+          style="background-color: rgba(255,255,255,0.1); color: #FFF;"
+          prepend-inner-icon="mdi-format-title"
+        />
+
+        <!-- Icon selection -->
+        <div class="mb-4">
+          <label class="text-body-2 mb-2 d-block">Icône</label>
+          <v-chip-group v-model="selectedIcon" mandatory>
+            <v-chip
+              v-for="icon in availableIcons"
+              :key="icon"
+              :value="icon"
+              filter
+              variant="outlined"
+              :color="selectedIcon === icon ? 'primary' : 'default'"
+            >
+              <v-icon left>{{ icon }}</v-icon>
+            </v-chip>
+          </v-chip-group>
+        </div>
+
+        <!-- NOUVEAU COMPOSANT DE PÉRIODE DE VALIDITÉ -->
+        <ValidityPeriodSelector
+          :initial-start-date="startDate"
+          :initial-end-date="endDate"
+          @update:period="onPeriodUpdate"
+        />
+
+        <!-- Tasks (Draggable) -->
+        <div class="mb-4">
+          <div class="d-flex align-center mb-2">
+            <label class="text-body-2">Tâches</label>
+            <v-spacer></v-spacer>
+            <v-btn
+              variant="text"
+              color="primary"
+              size="small"
+              class="d-inline-flex align-center"
+              @click="addTask"
+            >
+              <v-icon left size="small" class="mr-1">mdi-plus</v-icon>
+              Ajouter tâche
+            </v-btn>
+          </div>
+
+          <v-card class="mb-4" color="#1A237E">
+            <div ref="tasksContainer" class="pa-2">
+              <div
+                v-for="(task, index) in tasks"
+                :key="task.id"
+                class="d-flex align-center mb-2 task-item pa-2 rounded"
+              >
+                <!-- Drag handle -->
+                <v-btn icon class="drag-handle mr-2" size="small">
+                  <v-icon>mdi-drag</v-icon>
+                </v-btn>
+
+                <!-- Task Field -->
+                <v-text-field
+                  v-model="task.name"
+                  :label="`Tâche #${index + 1}`"
+                  placeholder="Nom de la tâche..."
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  class="flex-grow-1 mr-2"
+                  style="background-color: rgba(255,255,255,0.05); color: #FFF;"
+                  @change="unsavedChanges = true"
+                />
+
+                <!-- Remove Task -->
+                <v-btn icon color="error" size="small" @click="removeTask(index)">
+                  <v-icon>mdi-close</v-icon>
+                </v-btn>
+              </div>
+
+              <div v-if="tasks.length === 0" class="text-center py-4 text-subtitle-2">
+                Aucune tâche ajoutée. Cliquez sur "Ajouter tâche" pour commencer.
+              </div>
+            </div>
+          </v-card>
+        </div>
+
+        <!-- Partage avec groupe (optionnel) -->
+        <div v-if="userGroups.length > 0" class="mb-4">
+          <label class="text-body-2 mb-2 d-block">Partager avec un groupe (optionnel)</label>
+          <v-select
+            v-model="selectedGroup"
+            :items="[{name: 'Personnel', id: 'personnel'}, ...userGroups]"
+            item-title="name"
+            item-value="id"
+            label="Sélectionner un groupe"
+            variant="outlined"
+            hide-details="auto"
+            style="background-color: rgba(255,255,255,0.1); color: #FFF;"
+            prepend-inner-icon="mdi-account-group"
+            clearable
+          ></v-select>
+        </div>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn variant="text" color="grey" @click="goBack">
+          Annuler
+        </v-btn>
+        <v-btn
+          color="primary"
+          @click="submit"
+          :loading="isSubmitting"
+          :disabled="isSubmitting || tasks.every(task => !task.name.trim())"
+        >
+          {{ isEditing ? 'Mettre à jour' : 'Créer' }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-container>
+</template>
+
 <script setup>
-import { ref, onMounted, nextTick, computed, watch, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import Sortable from 'sortablejs'
-import timeSheetService from '@/services/timeSheetService'
-import taskService from '@/services/taskService'
-import groupService from '@/services/groupService'
+import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import Sortable from 'sortablejs';
+import timeSheetService from '@/services/timeSheetService';
+import taskService from '@/services/taskService';
+import groupService from '@/services/groupService';
+import ValidityPeriodSelector from '@/components/timesheet/ValidityPeriodSelector.vue';
 
-
-const router = useRouter()
-const route = useRoute()
+const router = useRouter();
+const route = useRoute();
 
 // État d'édition
-const isEditing = ref(false)
-const templateId = ref(null)
-const unsavedChanges = ref(false)
-const showSavePrompt = ref(false)
+const isEditing = ref(false);
+const templateId = ref(null);
+const unsavedChanges = ref(false);
+const showSavePrompt = ref(false);
 
 // État de soumission et messages
-const isSubmitting = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
+const isSubmitting = ref(false);
+const errorMessage = ref('');
+const successMessage = ref('');
 
 // Informations du formulaire
-const titre = ref('')
-const selectedIcon = ref('mdi-file-document')
-const tasks = ref([])
-const nextTaskId = ref(1)
+const titre = ref('');
+const selectedIcon = ref('mdi-file-document');
+const tasks = ref([]);
+const nextTaskId = ref(1);
 
 // Dates de validité
-const startDate = ref(new Date().toISOString().split('T')[0])
+const startDate = ref(new Date().toISOString().split('T')[0]);
 const endDate = ref((() => {
-  const date = new Date()
-  date.setDate(date.getDate() + 14) // Par défaut, 2 semaines de validité
-  return date.toISOString().split('T')[0]
-})())
-const startDateMenu = ref(false)
-const endDateMenu = ref(false)
+  const date = new Date();
+  date.setDate(date.getDate() + 14); // Par défaut, 2 semaines de validité
+  return date.toISOString().split('T')[0];
+})());
 
-const formattedStartDate = computed(() => {
-  return formatDate(startDate.value)
-})
-
-const formattedEndDate = computed(() => {
-  return formatDate(endDate.value)
-})
+// Informations avancées sur la période
+const periodInfo = ref({
+  startTime: '08:00',
+  endTime: '18:00'
+});
 
 // Partage de groupe
-const userGroups = ref([])
-const selectedGroup = ref(null)
-const personalGroupId = ref('personnel')
+const userGroups = ref([]);
+const selectedGroup = ref(null);
+const personalGroupId = ref('personnel');
 
 // Icônes disponibles
 const availableIcons = [
@@ -62,23 +220,23 @@ const availableIcons = [
   'mdi-heart',
   'mdi-leaf',
   'mdi-palette'
-]
+];
 
 // Reference pour SortableJS container
-const tasksContainer = ref(null)
+const tasksContainer = ref(null);
 
 // Fonction pour avertir l'utilisateur quand il tente de quitter avec des modifications non enregistrées
 const handleBeforeUnload = (e) => {
   if (unsavedChanges.value) {
-    e.preventDefault()
-    e.returnValue = ''
+    e.preventDefault();
+    e.returnValue = '';
   }
-}
+};
 
 // Récupérer les groupes pour le partage
 onMounted(async () => {
   // Ajouter l'écouteur d'événement beforeunload
-  window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('beforeunload', handleBeforeUnload);
 
   // Initialiser le drag-and-drop
   nextTick(() => {
@@ -89,37 +247,54 @@ onMounted(async () => {
         onEnd: (evt) => {
           // Reordonner les tâches
           if (evt.oldIndex !== evt.newIndex) {
-            const movedItem = tasks.value.splice(evt.oldIndex, 1)[0]
-            tasks.value.splice(evt.newIndex, 0, movedItem)
+            const movedItem = tasks.value.splice(evt.oldIndex, 1)[0];
+            tasks.value.splice(evt.newIndex, 0, movedItem);
             // Forcer la réactivité Vue
-            tasks.value = [...tasks.value]
-            unsavedChanges.value = true
+            tasks.value = [...tasks.value];
+            unsavedChanges.value = true;
           }
         }
-      })
+      });
     }
 
     // Vérifier s'il s'agit d'une édition (templateId dans l'URL)
-    const template = route.query.template
+    const template = route.query.template;
     if (template) {
-      templateId.value = parseInt(template)
-      isEditing.value = true
-      loadTemplate(templateId.value)
+      templateId.value = parseInt(template);
+      isEditing.value = true;
+      loadTemplate(templateId.value);
     } else {
       // Nouvelle feuille, ajouter une tâche vide
-      addTask()
+      addTask();
     }
 
     // Récupérer les groupes de l'utilisateur
-    loadUserGroups()
-  })
-})
+    loadUserGroups();
+  });
+});
 
 // Cleanup quand le composant est détruit
 onUnmounted(() => {
   // Supprimer l'écouteur d'événement beforeunload
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-})
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+});
+
+// Gestionnaire de mise à jour de la période
+const onPeriodUpdate = (periodData) => {
+  // Mettre à jour les dates
+  startDate.value = periodData.startDate;
+  endDate.value = periodData.endDate;
+
+  // Stocker les informations avancées
+  periodInfo.value = {
+    startTime: periodData.startTime,
+    endTime: periodData.endTime,
+    startDateTime: periodData.startDateTime,
+    endDateTime: periodData.endDateTime
+  };
+
+  unsavedChanges.value = true;
+};
 
 // Méthodes
 async function loadTemplate(id) {
@@ -242,7 +417,10 @@ async function submit() {
       title: titre.value,
       icon: selectedIcon.value,
       startDate: startDate.value,
-      endDate: endDate.value
+      endDate: endDate.value,
+      // Ajouter les infos de temps si disponibles
+      startTime: periodInfo.value.startTime,
+      endTime: periodInfo.value.endTime
     }
 
     // Stockage des durées existantes (pour les préserver)
@@ -336,251 +514,7 @@ async function submit() {
     isSubmitting.value = false;
   }
 }
-
-function formatDate(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-}
-
-// Observer les changements pour détecter les modifications non enregistrées
-watch([titre, selectedIcon, tasks, selectedGroup, startDate, endDate], () => {
-  unsavedChanges.value = true;
-})
 </script>
-
-<template>
-  <v-container fluid class="py-6 px-6" style="background-color: #2C2C5E;">
-    <!-- Main Card -->
-    <v-card
-      class="mx-auto pa-4"
-      max-width="800"
-      elevation="3"
-      style="background-color: rgb(40, 53, 147); color: #FFF; caret-color: #FFF;"
-    >
-      <!-- Headers avec actions -->
-      <v-card-item>
-        <template v-slot:prepend>
-          <v-btn icon variant="text" @click="goBack">
-            <v-icon>mdi-arrow-left</v-icon>
-          </v-btn>
-        </template>
-
-        <v-card-title class="text-h5">
-          <v-icon left class="mr-2">mdi-file-document-edit</v-icon>
-          {{ isEditing ? 'Modifier la feuille de temps' : 'Nouvelle feuille de temps' }}
-        </v-card-title>
-      </v-card-item>
-
-      <v-divider class="mb-4"></v-divider>
-
-      <v-card-text>
-        <!-- Alertes -->
-        <v-alert v-if="errorMessage" type="error" class="mb-4" closable>
-          {{ errorMessage }}
-        </v-alert>
-
-        <v-alert v-if="successMessage" type="success" class="mb-4" closable>
-          {{ successMessage }}
-        </v-alert>
-
-        <!-- Title Field -->
-        <v-text-field
-          v-model="titre"
-          label="Titre de la feuille de temps"
-          placeholder="Saisissez votre titre..."
-          variant="outlined"
-          class="mb-4"
-          hide-details="auto"
-          style="background-color: rgba(255,255,255,0.1); color: #FFF;"
-          prepend-inner-icon="mdi-format-title"
-        />
-
-        <!-- Icon selection -->
-        <div class="mb-4">
-          <label class="text-body-2 mb-2 d-block">Icône</label>
-          <v-chip-group v-model="selectedIcon" mandatory>
-            <v-chip
-              v-for="icon in availableIcons"
-              :key="icon"
-              :value="icon"
-              filter
-              variant="outlined"
-              :color="selectedIcon === icon ? 'primary' : 'default'"
-            >
-              <v-icon left>{{ icon }}</v-icon>
-            </v-chip>
-          </v-chip-group>
-        </div>
-
-        <!-- Durée de validité -->
-        <div class="mb-4">
-          <label class="text-body-2 mb-2 d-block">Durée de validité</label>
-          <v-row>
-            <v-col cols="6">
-              <v-menu
-                v-model="startDateMenu"
-                :close-on-content-click="false"
-              >
-                <template v-slot:activator="{ props }">
-                  <v-text-field
-                    v-model="formattedStartDate"
-                    label="Date de début"
-                    variant="outlined"
-                    prepend-inner-icon="mdi-calendar-start"
-                    bg-color="#1a237e"
-                    readonly
-                    v-bind="props"
-                  ></v-text-field>
-                </template>
-                <v-date-picker
-                  v-model="startDate"
-                  @update:model-value="startDateMenu = false"
-                ></v-date-picker>
-              </v-menu>
-            </v-col>
-            <v-col cols="6">
-              <v-menu
-                v-model="endDateMenu"
-                :close-on-content-click="false"
-              >
-                <template v-slot:activator="{ props }">
-                  <v-text-field
-                    v-model="formattedEndDate"
-                    label="Date de fin"
-                    variant="outlined"
-                    prepend-inner-icon="mdi-calendar-end"
-                    bg-color="#1a237e"
-                    readonly
-                    v-bind="props"
-                  ></v-text-field>
-                </template>
-                <v-date-picker
-                  v-model="endDate"
-                  :min="startDate"
-                  @update:model-value="endDateMenu = false"
-                ></v-date-picker>
-              </v-menu>
-            </v-col>
-          </v-row>
-        </div>
-
-        <!-- Tasks (Draggable) -->
-        <div class="mb-4">
-          <div class="d-flex align-center mb-2">
-            <label class="text-body-2">Tâches</label>
-            <v-spacer></v-spacer>
-            <v-btn
-              variant="text"
-              color="primary"
-              size="small"
-              class="d-inline-flex align-center"
-              @click="addTask"
-            >
-              <v-icon left size="small" class="mr-1">mdi-plus</v-icon>
-              Ajouter tâche
-            </v-btn>
-          </div>
-
-          <v-card class="mb-4" color="#1A237E">
-            <div ref="tasksContainer" class="pa-2">
-              <div
-                v-for="(task, index) in tasks"
-                :key="task.id"
-                class="d-flex align-center mb-2 task-item pa-2 rounded"
-              >
-                <!-- Drag handle -->
-                <v-btn icon class="drag-handle mr-2" size="small">
-                  <v-icon>mdi-drag</v-icon>
-                </v-btn>
-
-                <!-- Task Field -->
-                <v-text-field
-                  v-model="task.name"
-                  :label="`Tâche #${index + 1}`"
-                  placeholder="Nom de la tâche..."
-                  variant="outlined"
-                  density="compact"
-                  hide-details="auto"
-                  class="flex-grow-1 mr-2"
-                  style="background-color: rgba(255,255,255,0.05); color: #FFF;"
-                  @change="unsavedChanges = true"
-                />
-
-                <!-- Remove Task -->
-                <v-btn icon color="error" size="small" @click="removeTask(index)">
-                  <v-icon>mdi-close</v-icon>
-                </v-btn>
-              </div>
-
-              <div v-if="tasks.length === 0" class="text-center py-4 text-subtitle-2">
-                Aucune tâche ajoutée. Cliquez sur "Ajouter tâche" pour commencer.
-              </div>
-            </div>
-          </v-card>
-        </div>
-
-        <!-- Partage avec groupe (optionnel) -->
-        <div v-if="userGroups.length > 0" class="mb-4">
-          <label class="text-body-2 mb-2 d-block">Partager avec un groupe (optionnel)</label>
-          <v-select
-            v-model="selectedGroup"
-            :items="[{name: 'Personnel', id: 'personnel'}, ...userGroups]"
-            item-title="name"
-            item-value="id"
-            label="Sélectionner un groupe"
-            variant="outlined"
-            hide-details="auto"
-            style="background-color: rgba(255,255,255,0.1); color: #FFF;"
-            prepend-inner-icon="mdi-account-group"
-            clearable
-          ></v-select>
-        </div>
-      </v-card-text>
-
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn variant="text" color="grey" @click="goBack">
-          Annuler
-        </v-btn>
-        <v-btn
-          color="primary"
-          @click="submit"
-          :loading="isSubmitting"
-          :disabled="isSubmitting || tasks.every(task => !task.name.trim())"
-        >
-          {{ isEditing ? 'Mettre à jour' : 'Créer' }}
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-
-    <!-- Prompt sauvegarde non enregistrée -->
-    <v-dialog v-model="showSavePrompt" max-width="400">
-      <v-card>
-        <v-card-title class="text-h5">Enregistrer les modifications?</v-card-title>
-        <v-card-text>
-          Vous avez des modifications non enregistrées. Voulez-vous les sauvegarder avant de quitter?
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="showSavePrompt = false">
-            Annuler
-          </v-btn>
-          <v-btn color="error" variant="text" @click="goBackWithoutSaving">
-            Ne pas enregistrer
-          </v-btn>
-          <v-btn color="primary" @click="submit">
-            Enregistrer
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </v-container>
-</template>
 
 <style scoped>
 .drag-handle {
