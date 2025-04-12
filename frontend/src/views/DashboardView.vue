@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import StatsOverview from '@/components/dashboard/StatsOverview.vue';
-import DetailedStats from '@/components/dashboard/DetailedStats.vue';
+import ImprovedDetailedStats from '@/components/dashboard/ImprovedDetailedStats.vue'; // Nouveau composant
 import TimeSheetComponent from '@/components/timesheet/TimeSheetComponent.vue';
 import { useRouter, useRoute } from 'vue-router';
 
@@ -101,7 +101,7 @@ onMounted(() => {
           <StatsOverview ref="statsOverviewRef" />
 
           <!-- Statistiques détaillées -->
-          <DetailedStats ref="detailedStatsRef" class="mt-4" />
+          <ImprovedDetailedStats ref="detailedStatsRef" class="mt-4" />
         </div>
 
         <!-- Colonne de droite: Feuilles de temps -->
