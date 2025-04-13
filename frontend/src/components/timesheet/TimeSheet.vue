@@ -124,11 +124,11 @@
         </div>
 
         <!-- Partage avec groupe (optionnel) -->
-        <div v-if="userGroups.length > 0" class="mb-4">
+        <div class="mb-4">
           <label class="text-body-2 mb-2 d-block">Partager avec un groupe (optionnel)</label>
           <v-select
             v-model="selectedGroup"
-            :items="[{name: 'Personnel', id: 'personnel'}, ...userGroups]"
+            :items="userGroups"
             item-title="name"
             item-value="id"
             label="Sélectionner un groupe"
@@ -137,6 +137,7 @@
             style="background-color: rgba(255,255,255,0.1); color: #FFF;"
             prepend-inner-icon="mdi-account-group"
             clearable
+            :loading="loading"
           ></v-select>
           <div class="text-caption mt-1">{{ getGroupHelperText }}</div>
         </div>
@@ -364,18 +365,35 @@ async function loadTemplate(id) {
 
 const loadUserGroups = async () => {
   try {
+    console.log("Chargement des groupes...");
     // Récupérer tous les groupes de l'utilisateur
     const groups = await groupService.getUserGroups();
+    console.log("Groupes récupérés:", groups);
 
-    // Aucun filtrage - afficher tous les groupes dont l'utilisateur est membre
-    userGroups.value = groups.map(group => ({
+    // Filtrer pour ne garder que les groupes dont l'utilisateur est propriétaire
+    const ownedGroups = groups.filter(group => {
+      // Trouver l'entrée UserGroup pour l'utilisateur actuel
+      const userGroup = group.userGroups?.find(ug => ug.userId === authStore.user.id);
+      // Ne garder que les groupes où l'utilisateur a le rôle OWNER
+      return userGroup && userGroup.role === 'OWNER';
+    }).map(group => ({
       id: group.id,
       name: group.name
     }));
 
-    console.log("Groupes disponibles pour le partage:", userGroups.value);
+    console.log("Groupes filtrés (propriétaire uniquement):", ownedGroups);
+
+    // S'assurer que l'option "Personnel" est toujours présente
+    userGroups.value = [
+      { id: 'personnel', name: 'Personnel' },
+      ...ownedGroups
+    ];
+
+    console.log("Groupes disponibles finaux:", userGroups.value);
   } catch (error) {
     console.error('Erreur lors du chargement des groupes:', error);
+    // S'assurer qu'au moins l'option Personnel est disponible même en cas d'erreur
+    userGroups.value = [{ id: 'personnel', name: 'Personnel' }];
   }
 };
 

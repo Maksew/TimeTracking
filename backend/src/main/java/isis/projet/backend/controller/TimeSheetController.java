@@ -168,6 +168,17 @@ public class TimeSheetController {
                 return ResponseEntity.badRequest().body("Utilisateur introuvable");
             }
 
+            // Vérifier le partage de groupe si spécifié dans la requête
+            if (timeSheet.getSharedWithGroups() != null && !timeSheet.getSharedWithGroups().isEmpty()) {
+                for (TimeSheetShareGroup shareGroup : timeSheet.getSharedWithGroups()) {
+                    // Vérifier si l'utilisateur est propriétaire du groupe
+                    if (!userGroupService.isGroupOwner(userDetails.getId(), shareGroup.getGroupId())) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body("Vous devez être propriétaire du groupe pour y partager une feuille de temps");
+                    }
+                }
+            }
+
             TimeSheet createdTimeSheet = timeSheetService.createTimeSheet(timeSheet, userOpt.get());
             return ResponseEntity.ok(createdTimeSheet);
         } catch (RuntimeException e) {
@@ -289,6 +300,7 @@ public class TimeSheetController {
      * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
+    // Dans TimeSheetController.java
     @PostMapping("/{timeSheetId}/share/group/{groupId}")
     public ResponseEntity<?> shareTimeSheetWithGroup(
             @PathVariable Integer timeSheetId,
@@ -310,17 +322,17 @@ public class TimeSheetController {
             // Vérifier si l'utilisateur est le propriétaire de la feuille de temps
             boolean isOwner = timeSheet.getUser() != null && timeSheet.getUser().getId().equals(userId);
 
-            // Vérifier si l'utilisateur est membre du groupe
-            boolean isMember = userGroupService.isGroupMember(userId, groupId);
+            // Vérifier si l'utilisateur est propriétaire du groupe
+            boolean isGroupOwner = userGroupService.isGroupOwner(userId, groupId);
 
-            // Autoriser le partage si l'utilisateur est le propriétaire de la feuille
-            // ET qu'il est membre du groupe (même s'il n'en est pas le propriétaire)
-            if (isOwner && isMember) {
+            // Autoriser le partage uniquement si l'utilisateur est le propriétaire de la feuille
+            // ET qu'il est aussi propriétaire du groupe
+            if (isOwner && isGroupOwner) {
                 timeSheetService.shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel);
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body("Vous n'avez pas la permission de partager cette feuille de temps avec ce groupe");
+                        .body("Vous n'avez pas la permission de partager cette feuille de temps avec ce groupe. Seul le propriétaire du groupe peut partager des feuilles avec le groupe.");
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
