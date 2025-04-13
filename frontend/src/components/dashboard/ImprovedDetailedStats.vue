@@ -12,6 +12,7 @@ const error = ref(null);
 const expandedPanels = ref([]);
 const refreshInterval = ref(null);
 
+
 // Mode d'affichage (feuilles de temps ou groupes)
 const viewMode = ref('timesheets'); // 'timesheets' ou 'groups'
 
@@ -209,14 +210,14 @@ const getGroupColor = (groupId) => {
 const loadStatistics = async (silent = false) => {
   try {
     if (!silent) loading.value = true;
+    error.value = null;
 
-    // Chargement parallèle des données
-    const [statsResponse, allTimeSheets, allTasks] = await Promise.all([
-      statisticsService.getCurrentUserStatistics(),
-      timeSheetService.getUserTimeSheets(),
-      taskService.getAllTasks(),
-      loadGroups() // Charger les groupes en même temps
-    ]);
+    // 1. Charger les groupes de l'utilisateur
+    const groups = await groupService.getUserGroups();
+    userGroups.value = groups;
+
+    // 2. Charger toutes les tâches pour référence
+    const allTasks = await taskService.getAllTasks();
 
     // Construire un map des tâches par ID pour accès rapide
     const tasksByIdMap = {};
@@ -225,12 +226,43 @@ const loadStatistics = async (silent = false) => {
     });
     tasksMap.value = tasksByIdMap;
 
-    statistics.value = statsResponse;
-    timeSheets.value = allTimeSheets;
+    // 3. Récupérer les feuilles personnelles et partagées directement
+    const [ownedTimeSheets, sharedTimeSheets] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      timeSheetService.getSharedTimeSheets()
+    ]);
 
-    // Organiser les données par feuille de temps et par groupe
-    processTimeSheetsData(allTimeSheets, tasksByIdMap);
-    processGroupData(allTimeSheets, tasksByIdMap);
+    // 4. Récupérer les feuilles partagées avec chaque groupe
+    const groupSharedTimeSheetsPromises = [];
+    for (const group of groups) {
+      groupSharedTimeSheetsPromises.push(timeSheetService.getGroupTimeSheets(group.id));
+    }
+
+    const groupSharedTimeSheetsResults = await Promise.all(groupSharedTimeSheetsPromises);
+
+    // 5. Fusionner toutes les feuilles de temps
+    let allTimeSheets = [...ownedTimeSheets, ...sharedTimeSheets];
+
+    groupSharedTimeSheetsResults.forEach(groupSheets => {
+      if (Array.isArray(groupSheets)) {
+        allTimeSheets = [...allTimeSheets, ...groupSheets];
+      }
+    });
+
+    // 6. Dédupliquer pour éviter les doublons
+    const uniqueTimeSheets = [...new Map(allTimeSheets.map(sheet => [sheet.id, sheet])).values()];
+
+    // Stocker les feuilles de temps
+    timeSheets.value = uniqueTimeSheets;
+
+    // 7. Récupérer les statistiques globales depuis le backend
+    statistics.value = await statisticsService.getCurrentUserStatistics();
+
+    // 8. Organiser les données pour l'affichage
+    processTimeSheetsData(uniqueTimeSheets, tasksByIdMap);
+    processGroupData(uniqueTimeSheets, tasksByIdMap);
+
+    console.log(`Statistiques chargées: ${uniqueTimeSheets.length} feuilles au total`);
 
     if (!silent) loading.value = false;
   } catch (err) {

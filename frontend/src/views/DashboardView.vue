@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/auth';
 import StatsOverview from '@/components/dashboard/StatsOverview.vue';
 import ImprovedDetailedStats from '@/components/dashboard/ImprovedDetailedStats.vue'; // Nouveau composant
 import TimeSheetComponent from '@/components/timesheet/TimeSheetComponent.vue';
+import timeSheetService from '@/services/timeSheetService';
+import groupService from '@/services/groupService';
 import { useRouter, useRoute } from 'vue-router';
 
 const router = useRouter();
@@ -18,6 +20,7 @@ const detailedStatsRef = ref(null);
 const timeSheetComponentRef = ref(null);
 
 // États pour le chargement
+const timeSheets = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
@@ -56,18 +59,49 @@ const handleDataChanged = () => {
   refreshAllStats();
 };
 
-onMounted(() => {
-  if (route.query.force_refresh === 'true') {
-    console.log('Rafraîchissement forcé demandé après édition de feuille de temps');
-    // Supprimer le paramètre de l'URL sans recharger la page
-    router.replace({ query: {} });
-    // Attendre un peu pour s'assurer que les composants sont montés
-    setTimeout(() => {
-      refreshAllStats();
-      if (timeSheetComponentRef.value) {
-        timeSheetComponentRef.value.refreshData();
+onMounted(async () => {
+  try {
+    loading.value = true;
+
+    // 1. Charger les groupes de l'utilisateur
+    const userGroups = await groupService.getUserGroups();
+
+    // 2. Récupérer les feuilles personnelles et partagées directement avec l'utilisateur
+    const [ownedTimeSheets, sharedWithUserTimeSheets] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      timeSheetService.getSharedTimeSheets()
+    ]);
+
+    // 3. Récupérer les feuilles partagées avec chaque groupe dont l'utilisateur est membre
+    const groupSharedTimeSheetsPromises = [];
+    for (const group of userGroups) {
+      groupSharedTimeSheetsPromises.push(timeSheetService.getGroupTimeSheets(group.id));
+    }
+
+    // Attendre que toutes les requêtes soient terminées
+    const groupSharedTimeSheetsResults = await Promise.all(groupSharedTimeSheetsPromises);
+
+    // 4. Fusionner toutes les feuilles de temps récupérées
+    let allTimeSheets = [...ownedTimeSheets, ...sharedWithUserTimeSheets];
+
+    // Ajouter les feuilles partagées avec les groupes
+    groupSharedTimeSheetsResults.forEach(groupSheets => {
+      if (Array.isArray(groupSheets)) {
+        allTimeSheets = [...allTimeSheets, ...groupSheets];
       }
-    }, 200);
+    });
+
+    // 5. Dédupliquer en cas de doublons (sur la base de l'ID)
+    const uniqueSheets = [...new Map(allTimeSheets.map(sheet => [sheet.id, sheet])).values()];
+
+    // Mettre à jour la liste des feuilles
+    timeSheets.value = uniqueSheets;
+
+    loading.value = false;
+  } catch (err) {
+    console.error('Erreur lors du chargement des feuilles de temps:', err);
+    error.value = 'Impossible de charger les feuilles de temps';
+    loading.value = false;
   }
 });
 

@@ -3,6 +3,7 @@
 import { doAjaxRequestWithAuth } from '@/util/httpInterceptor'
 import { useAuthStore } from '@/stores/auth'
 
+
 export default {
   // Récupérer tous les groupes
   getAllGroups() {

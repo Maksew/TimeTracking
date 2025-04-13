@@ -271,6 +271,7 @@ const router = useRouter();
 // Référence aux templates existants (historique des feuilles)
 const existingTemplates = ref([]);
 const loading = ref(true);
+const error = ref(null);
 
 // Groupes pour filtrage
 const groups = ref([]);
@@ -418,20 +419,48 @@ function isInDateRange(dateString) {
 // Charger les données initiales
 onMounted(async () => {
   try {
-    // Chargement parallèle pour optimisation
-    const [timeSheets, userGroups] = await Promise.all([
-      timeSheetService.getUserTimeSheets(),
-      groupService.getUserGroups()
-    ]);
+    loading.value = true;
 
-    // Stocker les données
-    existingTemplates.value = timeSheets;
+    // 1. Charger les groupes de l'utilisateur
+    const userGroups = await groupService.getUserGroups();
     groups.value = userGroups;
 
-    console.log('Templates chargés:', timeSheets.length);
-    console.log('Groupes disponibles:', userGroups.length);
-  } catch (error) {
-    console.error('Erreur lors du chargement des données:', error);
+    // 2. Récupérer les feuilles personnelles et partagées directement
+    const [ownedTimeSheets, sharedWithUserTimeSheets] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      timeSheetService.getSharedTimeSheets()
+    ]);
+
+    // 3. Récupérer les feuilles partagées avec chaque groupe dont l'utilisateur est membre
+    const groupSharedTimeSheetsPromises = [];
+    for (const group of userGroups) {
+      groupSharedTimeSheetsPromises.push(timeSheetService.getGroupTimeSheets(group.id));
+    }
+
+    // Attendre que toutes les requêtes soient terminées
+    const groupSharedTimeSheetsResults = await Promise.all(groupSharedTimeSheetsPromises);
+
+    // 4. Fusionner toutes les feuilles de temps récupérées
+    let allTimeSheets = [...ownedTimeSheets, ...sharedWithUserTimeSheets];
+
+    // Ajouter les feuilles partagées avec les groupes
+    groupSharedTimeSheetsResults.forEach(groupSheets => {
+      if (Array.isArray(groupSheets)) {
+        allTimeSheets = [...allTimeSheets, ...groupSheets];
+      }
+    });
+
+    // 5. Dédupliquer en cas de doublons (sur la base de l'ID)
+    const uniqueSheets = [...new Map(allTimeSheets.map(sheet => [sheet.id, sheet])).values()];
+
+    // Mettre à jour la liste des feuilles
+    existingTemplates.value = uniqueSheets;
+
+    console.log(`Chargé ${uniqueSheets.length} feuilles au total (${ownedTimeSheets.length} personnelles, ${sharedWithUserTimeSheets.length} partagées directement, plus les feuilles via groupes)`);
+
+  } catch (err) {
+    console.error('Erreur lors du chargement des données:', err);
+    error.value = 'Erreur lors du chargement des données: ' + err.message;
   } finally {
     loading.value = false;
   }
@@ -469,6 +498,7 @@ watch(dateRange, (newVal) => {
   }
 });
 </script>
+
 
 <style scoped>
 .timesheet-view {

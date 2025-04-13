@@ -422,6 +422,8 @@ const loading = ref(true);
 const error = ref(null);
 const statusMessage = ref('');
 const processingTask = ref(false); // Indicateur de traitement en cours
+const tasksMap = ref({});
+
 
 // Données principales
 const timeSheets = ref([]);
@@ -567,26 +569,48 @@ const loadTimeSheets = async () => {
     loading.value = true;
     error.value = null;
 
-    // Récupérer les feuilles de temps, les groupes et toutes les tâches en parallèle
-    const [sheets, groups, tasks] = await Promise.all([
-      timeSheetService.getUserTimeSheets(),
-      groupService.getUserGroups(),
-      taskService.getAllTasks()
-    ]);
-
-    // Stocker toutes les tâches
-    allTasks.value = tasks;
-
-    // Créer un map des tâches par ID pour un accès rapide
-    const tasksMap = {};
-    tasks.forEach(task => {
-      tasksMap[task.id] = task;
-    });
-
+    // 1. Charger les groupes de l'utilisateur
+    const groups = await groupService.getUserGroups();
     userGroups.value = groups;
 
-    // Traiter les feuilles de temps pour s'assurer que les propriétés nécessaires sont présentes
-    timeSheets.value = sheets.map(sheet => {
+    // 2. Charger toutes les tâches pour référence rapide
+    const allTasks = await taskService.getAllTasks();
+
+    // Créer un map des tâches par ID pour un accès rapide
+    const tasksByIdMap = {};
+    allTasks.forEach(task => {
+      tasksByIdMap[task.id] = task;
+    });
+    tasksMap.value = tasksByIdMap;
+
+    // 3. Récupérer les feuilles personnelles et partagées directement
+    const [ownedTimeSheets, sharedTimeSheets] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      timeSheetService.getSharedTimeSheets()
+    ]);
+
+    // 4. Récupérer les feuilles partagées avec chaque groupe
+    const groupSharedTimeSheetsPromises = [];
+    for (const group of groups) {
+      groupSharedTimeSheetsPromises.push(timeSheetService.getGroupTimeSheets(group.id));
+    }
+
+    const groupSharedTimeSheetsResults = await Promise.all(groupSharedTimeSheetsPromises);
+
+    // 5. Fusionner toutes les feuilles de temps récupérées
+    let allTimeSheets = [...ownedTimeSheets, ...sharedTimeSheets];
+
+    groupSharedTimeSheetsResults.forEach(groupSheets => {
+      if (Array.isArray(groupSheets)) {
+        allTimeSheets = [...allTimeSheets, ...groupSheets];
+      }
+    });
+
+    // 6. Dédupliquer en cas de doublons (sur la base de l'ID)
+    const uniqueTimeSheets = [...new Map(allTimeSheets.map(sheet => [sheet.id, sheet])).values()];
+
+    // 7. Traiter les feuilles de temps pour s'assurer que les propriétés nécessaires sont présentes
+    const processedTimeSheets = uniqueTimeSheets.map(sheet => {
       // Si pas de titre, utiliser la date formatée
       if (!sheet.title) {
         sheet.title = `Feuille du ${new Date(sheet.entryDate).toLocaleDateString()}`;
@@ -596,7 +620,7 @@ const loadTimeSheets = async () => {
       if (sheet.timeSheetTasks) {
         sheet.timeSheetTasks = sheet.timeSheetTasks.map(task => {
           // Récupérer le nom de la tâche depuis le tasksMap
-          const taskDetails = tasksMap[task.taskId];
+          const taskDetails = tasksByIdMap[task.taskId];
 
           if (taskDetails) {
             // Assurer que chaque tâche a un nom à partir de la tâche trouvée
@@ -617,15 +641,14 @@ const loadTimeSheets = async () => {
       return sheet;
     });
 
-    // Par défaut, sélectionner "Tous" (null)
-    if (!selectedGroup.value) {
-      selectedGroup.value = null;
-    }
+    // Mettre à jour les feuilles de temps
+    timeSheets.value = processedTimeSheets;
 
-    // Par défaut, ouvrir la première feuille de temps si aucune n'est sélectionnée
-    if (sheets.length > 0 && !selectedTimeSheet.value) {
-      setSelectedTimeSheet(sheets[0]);
-    }
+    console.log(`Chargement terminé: ${processedTimeSheets.length} feuilles au total`);
+    console.log(`- ${ownedTimeSheets.length} personnelles`);
+    console.log(`- ${sharedTimeSheets.length} partagées directement`);
+    console.log(`- Autres via groupes`);
+
   } catch (err) {
     console.error('Erreur lors du chargement des feuilles de temps:', err);
     error.value = 'Impossible de charger les feuilles de temps';
@@ -864,8 +887,9 @@ const saveConfirmedTime = async () => {
 };
 
 const refreshData = async (silent = false) => {
+  if (!silent) loading.value = true;
   await loadTimeSheets();
-  emit('data-changed');
+  if (!silent) loading.value = false;
 };
 
 defineExpose({
