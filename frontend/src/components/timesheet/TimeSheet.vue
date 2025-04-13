@@ -169,6 +169,9 @@ import timeSheetService from '@/services/timeSheetService';
 import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
 import ValidityPeriodSelector from '@/components/timesheet/ValidityPeriodSelector.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
 
 const router = useRouter();
 const route = useRoute();
@@ -366,9 +369,17 @@ async function loadTemplate(id) {
 const loadUserGroups = async () => {
   try {
     console.log("Chargement des groupes...");
+
     // Récupérer tous les groupes de l'utilisateur
     const groups = await groupService.getUserGroups();
     console.log("Groupes récupérés:", groups);
+
+    // Assurez-vous que authStore.user existe et a un id
+    if (!authStore || !authStore.user || !authStore.user.id) {
+      console.error("Impossible d'accéder aux informations de l'utilisateur connecté");
+      userGroups.value = [{ id: 'personnel', name: 'Personnel' }];
+      return;
+    }
 
     // Filtrer pour ne garder que les groupes dont l'utilisateur est propriétaire
     const ownedGroups = groups.filter(group => {
