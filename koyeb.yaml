@@ -1,3 +1,5 @@
 name: timetracking
 builder:
   build_dir: backend
+  buildpacks:
+    - heroku/java
