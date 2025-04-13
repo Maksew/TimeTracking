@@ -92,8 +92,21 @@
       <v-progress-circular indeterminate size="64" color="white"></v-progress-circular>
     </div>
 
+    <!-- Message d'erreur -->
+    <v-alert v-else-if="error" type="error" class="mx-4 mb-4" closable @click:close="error = ''">
+      {{ error }}
+    </v-alert>
+
     <!-- Vue organisée des feuilles de temps par groupe -->
     <div v-else>
+      <!-- Notification de succès -->
+      <v-snackbar v-model="showNotification" :timeout="3000" color="success">
+        {{ notificationMessage }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="showNotification = false">Fermer</v-btn>
+        </template>
+      </v-snackbar>
+
       <!-- Feuille de temps vierge -->
       <div class="px-4">
         <v-row dense>
@@ -135,7 +148,8 @@
               <v-card
                 class="timesheet-card"
                 height="180"
-                :to="`/editTimeSheet?template=${template.id}`"
+                :to="canEditTimeSheet(template) ? `/editTimeSheet?template=${template.id}` : null"
+                @click="!canEditTimeSheet(template) ? showReadOnlyWarning() : null"
                 elevation="2"
                 color="#283593"
               >
@@ -146,6 +160,12 @@
                   </div>
 
                   <h3 class="text-h6 white--text mb-2">{{ template.title || `Feuille du ${formatDate(template.entryDate)}` }}</h3>
+
+                  <!-- Indicateur de lecture seule -->
+                  <div v-if="!canEditTimeSheet(template)" class="read-only-indicator">
+                    <v-icon color="error" size="small" class="mr-1">mdi-lock</v-icon>
+                    <span class="text-caption error--text">Lecture seule</span>
+                  </div>
 
                   <div class="d-flex align-center mt-3">
                     <v-icon size="small" color="white" class="mr-1">mdi-checkbox-marked-circle-outline</v-icon>
@@ -193,7 +213,8 @@
               <v-card
                 class="timesheet-card"
                 height="180"
-                :to="`/editTimeSheet?template=${template.id}`"
+                :to="canEditTimeSheet(template) ? `/editTimeSheet?template=${template.id}` : null"
+                @click="!canEditTimeSheet(template) ? showReadOnlyWarning() : null"
                 elevation="2"
                 color="#283593"
               >
@@ -211,6 +232,12 @@
                   </div>
 
                   <h3 class="text-h6 white--text mb-2">{{ template.title || `Feuille du ${formatDate(template.entryDate)}` }}</h3>
+
+                  <!-- Indicateur de lecture seule -->
+                  <div v-if="!canEditTimeSheet(template)" class="read-only-indicator">
+                    <v-icon color="error" size="small" class="mr-1">mdi-lock</v-icon>
+                    <span class="text-caption error--text">Lecture seule</span>
+                  </div>
 
                   <div class="d-flex align-center mt-3">
                     <v-icon size="small" color="white" class="mr-1">mdi-checkbox-marked-circle-outline</v-icon>
@@ -257,21 +284,49 @@
         </v-card>
       </div>
     </div>
+
+    <!-- Dialog d'information sur la lecture seule -->
+    <v-dialog v-model="readOnlyDialog" max-width="500px">
+      <v-card color="#283593" dark>
+        <v-card-title class="d-flex align-center">
+          <v-icon color="error" class="mr-2">mdi-lock</v-icon>
+          Accès en lecture seule
+        </v-card-title>
+        <v-card-text>
+          <p>Cette feuille de temps est partagée avec un groupe dont vous n'êtes pas le propriétaire.</p>
+          <p class="mt-2">Seul le propriétaire du groupe peut modifier les feuilles de temps partagées avec le groupe.</p>
+          <p class="mt-4 font-weight-medium">Vous pouvez uniquement consulter cette feuille, mais pas la modifier.</p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="readOnlyDialog = false">Compris</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
 import groupService from '@/services/groupService';
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 // Référence aux templates existants (historique des feuilles)
 const existingTemplates = ref([]);
 const loading = ref(true);
 const error = ref(null);
+
+// Notification
+const showNotification = ref(false);
+const notificationMessage = ref('');
+
+// Dialogues
+const readOnlyDialog = ref(false);
 
 // Groupes pour filtrage
 const groups = ref([]);
@@ -317,6 +372,30 @@ const dateRangeText = computed(() => {
 const hasFilters = computed(() => {
   return selectedGroupFilter.value !== null || dateRange.value.length > 0;
 });
+
+// Détermine si l'utilisateur a le droit de modifier une feuille de temps
+const canEditTimeSheet = (template) => {
+  // Cas 1: C'est une feuille personnelle créée par l'utilisateur courant
+  if (template.user && template.user.id === authStore.user.id) {
+    return true;
+  }
+
+  // Cas 2: C'est une feuille partagée avec un groupe
+  if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
+    const groupId = template.sharedWithGroups[0].groupId;
+
+    // Vérifier si l'utilisateur est propriétaire de ce groupe
+    const group = groups.value.find(g => g.id === groupId);
+    if (!group) return false;
+
+    // Vérifier si l'utilisateur a le rôle OWNER dans ce groupe
+    const userGroup = group.userGroups?.find(ug => ug.userId === authStore.user.id);
+    return userGroup && userGroup.role === 'OWNER';
+  }
+
+  // Par défaut, pas d'accès en écriture
+  return false;
+};
 
 // Feuilles de temps personnelles (pas partagées avec un groupe)
 const personalTemplates = computed(() => {
@@ -416,10 +495,16 @@ function isInDateRange(dateString) {
   return true;
 }
 
+// Afficher un avertissement pour les feuilles en lecture seule
+function showReadOnlyWarning() {
+  readOnlyDialog.value = true;
+}
+
 // Charger les données initiales
-onMounted(async () => {
+async function loadAllData() {
   try {
     loading.value = true;
+    error.value = null;
 
     // 1. Charger les groupes de l'utilisateur
     const userGroups = await groupService.getUserGroups();
@@ -464,7 +549,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
 
 // Appliquer les filtres
 function applyFilters() {
@@ -472,12 +557,20 @@ function applyFilters() {
     groupe: selectedGroupFilter.value,
     dates: dateRange.value
   });
+
+  // Afficher un message de confirmation
+  notificationMessage.value = 'Filtres appliqués avec succès';
+  showNotification.value = true;
 }
 
 // Réinitialiser les filtres
 function clearFilters() {
   selectedGroupFilter.value = null;
   dateRange.value = [];
+
+  // Afficher un message de confirmation
+  notificationMessage.value = 'Filtres réinitialisés';
+  showNotification.value = true;
 }
 
 // Formater une date pour l'affichage
@@ -491,6 +584,11 @@ function formatDate(dateString) {
   });
 }
 
+// Charger les données au montage du composant
+onMounted(() => {
+  loadAllData();
+});
+
 // Fermer le sélecteur de date quand la date est sélectionnée (pour le range)
 watch(dateRange, (newVal) => {
   if (newVal.length === 2) {
@@ -498,7 +596,6 @@ watch(dateRange, (newVal) => {
   }
 });
 </script>
-
 
 <style scoped>
 .timesheet-view {
@@ -552,6 +649,7 @@ watch(dateRange, (newVal) => {
   transition: transform 0.3s, box-shadow 0.3s;
   overflow: hidden;
   position: relative;
+  cursor: pointer;
 }
 
 .timesheet-card:hover {
@@ -564,6 +662,7 @@ watch(dateRange, (newVal) => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .personal-chip {
@@ -574,5 +673,17 @@ watch(dateRange, (newVal) => {
 .group-chip {
   font-weight: bold;
   letter-spacing: 0.5px;
+}
+
+.read-only-indicator {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(244, 67, 54, 0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(244, 67, 54, 0.5);
 }
 </style>

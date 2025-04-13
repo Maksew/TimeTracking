@@ -1,12 +1,11 @@
 package isis.projet.backend.controller;
 
-import isis.projet.backend.entity.TimeSheet;
-import isis.projet.backend.entity.TimeSheetTask;
-import isis.projet.backend.entity.TimeSheetTaskId;
-import isis.projet.backend.entity.User;
+import isis.projet.backend.entity.*;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
+import isis.projet.backend.repository.UserGroupRepository;
 import isis.projet.backend.security.jwt.JwtUserDetails;
 import isis.projet.backend.service.TimeSheetService;
+import isis.projet.backend.service.UserGroupService;
 import isis.projet.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -35,6 +34,48 @@ public class TimeSheetController {
 
     @Autowired
     private TimeSheetTaskRepository timeSheetTaskRepository;
+
+    @Autowired
+    private UserGroupService userGroupService;
+
+    /**
+     * Vérifie si l'utilisateur a le droit de modifier une feuille de temps
+     * @param timeSheetId ID de la feuille de temps
+     * @param authentication Informations d'authentification de l'utilisateur
+     * @return true si l'utilisateur peut modifier la feuille, false sinon
+     */
+    private boolean canUserEditTimeSheet(Integer timeSheetId, Authentication authentication) {
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        Integer userId = userDetails.getId();
+
+        // Récupérer la feuille de temps
+        Optional<TimeSheet> timeSheetOpt = timeSheetService.getTimeSheetById(timeSheetId);
+        if (timeSheetOpt.isEmpty()) {
+            return false;
+        }
+
+        TimeSheet timeSheet = timeSheetOpt.get();
+
+        // Cas 1: L'utilisateur est le propriétaire de la feuille
+        if (timeSheet.getUser() != null && timeSheet.getUser().getId().equals(userId)) {
+            return true;
+        }
+
+        // Cas 2: La feuille est partagée avec un groupe dont l'utilisateur est propriétaire
+        if (timeSheet.getSharedWithGroups() != null && !timeSheet.getSharedWithGroups().isEmpty()) {
+            for (TimeSheetShareGroup shareGroup : timeSheet.getSharedWithGroups()) {
+                Integer groupId = shareGroup.getGroupId();
+
+                // Utiliser le service pour vérifier si l'utilisateur est propriétaire du groupe
+                if (userGroupService.isGroupOwner(userId, groupId)) {
+                    return true;
+                }
+            }
+        }
+
+        // Aucune condition n'est remplie, l'utilisateur ne peut pas modifier
+        return false;
+    }
 
     /**
      * Récupère toutes les feuilles de temps de l'utilisateur connecté
@@ -138,13 +179,20 @@ public class TimeSheetController {
      * Met à jour une feuille de temps
      * @param id ID de la feuille de temps
      * @param timeSheet Feuille de temps à mettre à jour
+     * @param authentication Informations d'authentification
      * @return Feuille de temps mise à jour
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateTimeSheet(@PathVariable Integer id, @RequestBody TimeSheet timeSheet) {
+    public ResponseEntity<?> updateTimeSheet(@PathVariable Integer id, @RequestBody TimeSheet timeSheet, Authentication authentication) {
         try {
             if (!id.equals(timeSheet.getId())) {
                 return ResponseEntity.badRequest().body("ID de la feuille de temps incohérent");
+            }
+
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(id, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de modifier cette feuille de temps");
             }
 
             TimeSheet updatedTimeSheet = timeSheetService.updateTimeSheet(timeSheet);
@@ -157,11 +205,18 @@ public class TimeSheetController {
     /**
      * Supprime une feuille de temps
      * @param id ID de la feuille de temps
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteTimeSheet(@PathVariable Integer id) {
+    public ResponseEntity<?> deleteTimeSheet(@PathVariable Integer id, Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(id, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de supprimer cette feuille de temps");
+            }
+
             timeSheetService.deleteTimeSheet(id);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -173,13 +228,21 @@ public class TimeSheetController {
      * Ajoute une tâche à une feuille de temps
      * @param timeSheetId ID de la feuille de temps
      * @param taskData Données de la tâche
+     * @param authentication Informations d'authentification
      * @return Tâche ajoutée
      */
     @PostMapping("/{timeSheetId}/tasks")
     public ResponseEntity<?> addTaskToTimeSheet(
             @PathVariable Integer timeSheetId,
-            @RequestBody Map<String, Object> taskData) {
+            @RequestBody Map<String, Object> taskData,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de modifier cette feuille de temps");
+            }
+
             Integer taskId = (Integer) taskData.get("taskId");
             Integer duration = (Integer) taskData.get("duration");
 
@@ -195,14 +258,22 @@ public class TimeSheetController {
      * @param timeSheetId ID de la feuille de temps
      * @param userId ID de l'utilisateur
      * @param accessLevel Niveau d'accès
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @PostMapping("/{timeSheetId}/share/user/{userId}")
     public ResponseEntity<?> shareTimeSheetWithUser(
             @PathVariable Integer timeSheetId,
             @PathVariable Integer userId,
-            @RequestParam String accessLevel) {
+            @RequestParam String accessLevel,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de partager cette feuille de temps");
+            }
+
             timeSheetService.shareTimeSheetWithUser(timeSheetId, userId, accessLevel);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -215,14 +286,22 @@ public class TimeSheetController {
      * @param timeSheetId ID de la feuille de temps
      * @param groupId ID du groupe
      * @param accessLevel Niveau d'accès
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @PostMapping("/{timeSheetId}/share/group/{groupId}")
     public ResponseEntity<?> shareTimeSheetWithGroup(
             @PathVariable Integer timeSheetId,
             @PathVariable Integer groupId,
-            @RequestParam String accessLevel) {
+            @RequestParam String accessLevel,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de partager cette feuille de temps");
+            }
+
             timeSheetService.shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -260,14 +339,22 @@ public class TimeSheetController {
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche
      * @param taskData Données de la tâche à mettre à jour
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @PutMapping("/{timeSheetId}/tasks/{taskId}")
     public ResponseEntity<?> updateTaskDuration(
             @PathVariable Integer timeSheetId,
             @PathVariable Integer taskId,
-            @RequestBody Map<String, Integer> taskData) {
+            @RequestBody Map<String, Integer> taskData,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de modifier cette feuille de temps");
+            }
+
             Integer durationInSeconds = taskData.get("duration");
             if (durationInSeconds == null) {
                 return ResponseEntity.badRequest().body("La durée est requise");
@@ -286,14 +373,22 @@ public class TimeSheetController {
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche
      * @param completionData Données avec l'état "complété"
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @PutMapping("/{timeSheetId}/tasks/{taskId}/complete")
     public ResponseEntity<?> updateTaskCompletionState(
             @PathVariable Integer timeSheetId,
             @PathVariable Integer taskId,
-            @RequestBody Map<String, Boolean> completionData) {
+            @RequestBody Map<String, Boolean> completionData,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de modifier cette feuille de temps");
+            }
+
             Boolean isCompleted = completionData.get("completed");
             if (isCompleted == null) {
                 return ResponseEntity.badRequest().body("L'état de complétion est requis");
@@ -311,13 +406,21 @@ public class TimeSheetController {
      * Supprime une tâche d'une feuille de temps
      * @param timeSheetId ID de la feuille de temps
      * @param taskId ID de la tâche
+     * @param authentication Informations d'authentification
      * @return Statut de l'opération
      */
     @DeleteMapping("/{timeSheetId}/tasks/{taskId}")
     public ResponseEntity<?> removeTaskFromTimeSheet(
             @PathVariable Integer timeSheetId,
-            @PathVariable Integer taskId) {
+            @PathVariable Integer taskId,
+            Authentication authentication) {
         try {
+            // Vérifier les permissions
+            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de modifier cette feuille de temps");
+            }
+
             // Appeler le service pour supprimer la tâche de la feuille de temps
             timeSheetService.removeTaskFromTimeSheet(timeSheetId, taskId);
 
