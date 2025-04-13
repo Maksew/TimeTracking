@@ -10,7 +10,13 @@ service:
         value: "jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres"
       - name: SPRING_DATASOURCE_USERNAME
         value: "postgres"
+      - name: SPRING_DATASOURCE_PASSWORD
+        secret: SUPABASE_PASSWORD
       - name: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: "update"
       - name: SPRING_JPA_DATABASE_PLATFORM
         value: "org.hibernate.dialect.PostgreSQLDialect"
+      - name: SERVER_PORT
+        value: "8989"
+      - name: JAVA_TOOL_OPTIONS
+        value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
