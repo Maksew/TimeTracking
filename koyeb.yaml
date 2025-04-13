@@ -1,7 +1,7 @@
 name: timetracking
-builder:
-  buildpacks:
-    - heroku/java
-  skip_buildpacks:
-    - heroku/nodejs-engine
-    - heroku/nodejs-npm-install
+service:
+  app:
+    dockerfile: Dockerfile
+    ports:
+      - port: 8989
+        protocol: http
