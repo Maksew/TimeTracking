@@ -3,3 +3,6 @@ builder:
   build_dir: backend
   buildpacks:
     - heroku/java
+  skip_buildpacks:
+    - heroku/nodejs-engine
+    - heroku/nodejs-npm-install
