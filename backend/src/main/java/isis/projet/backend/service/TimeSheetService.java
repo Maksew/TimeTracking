@@ -71,12 +71,21 @@ public class TimeSheetService {
         if (timeSheet.getEntryDate() == null) {
             timeSheet.setEntryDate(LocalDate.now());
         }
+
+        // Gestion des périodes de validité
+        if (timeSheet.getStartDate() == null) {
+            timeSheet.setStartDate(LocalDate.now());
+        }
+        if (timeSheet.getEndDate() == null) {
+            timeSheet.setEndDate(LocalDate.now().plusWeeks(2)); // Par défaut 2 semaines
+        }
+
         return timeSheetRepository.save(timeSheet);
     }
 
     /**
      * Met à jour une feuille de temps
-     * @param 'timeSheet' Feuille de temps à mettre à jour
+     * @param updatedTimeSheet Feuille de temps à mettre à jour
      * @return Feuille de temps mise à jour
      */
     public TimeSheet updateTimeSheet(TimeSheet updatedTimeSheet) {
@@ -95,12 +104,17 @@ public class TimeSheetService {
         // Mettre à jour les champs autorisés tout en préservant l'association avec l'utilisateur
         existingTimeSheet.setEntryDate(updatedTimeSheet.getEntryDate());
         existingTimeSheet.setIcon(updatedTimeSheet.getIcon());
-        // Ajoutez ici d'autres mises à jour de champs si nécessaire
+        existingTimeSheet.setTitle(updatedTimeSheet.getTitle());
+
+        // Mettre à jour les champs de période de validité
+        existingTimeSheet.setStartDate(updatedTimeSheet.getStartDate());
+        existingTimeSheet.setEndDate(updatedTimeSheet.getEndDate());
+        existingTimeSheet.setStartTime(updatedTimeSheet.getStartTime());
+        existingTimeSheet.setEndTime(updatedTimeSheet.getEndTime());
 
         // Sauvegarder et retourner la feuille de temps mise à jour
         return timeSheetRepository.save(existingTimeSheet);
     }
-
 
     /**
      * Supprime une feuille de temps
@@ -270,7 +284,7 @@ public class TimeSheetService {
         StringBuilder csvContent = new StringBuilder();
 
         // En-tête
-        csvContent.append("ID,Date,Icon,UserID,TaskID,TaskName,Duration\n");
+        csvContent.append("ID,Date,Icon,UserID,TaskID,TaskName,Duration,StartDate,EndDate\n");
 
         // Données
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -285,7 +299,9 @@ public class TimeSheetService {
                 csvContent.append(timeSheet.getUser().getId()).append(",");
                 csvContent.append(task.getTaskId()).append(",");
                 csvContent.append(task.getTask() != null ? task.getTask().getName().replace(",", ";") : "Unknown").append(",");
-                csvContent.append(task.getDuration()).append("\n");
+                csvContent.append(task.getDuration()).append(",");
+                csvContent.append(timeSheet.getStartDate() != null ? timeSheet.getStartDate().format(dateFormatter) : "").append(",");
+                csvContent.append(timeSheet.getEndDate() != null ? timeSheet.getEndDate().format(dateFormatter) : "").append("\n");
             }
         }
 
