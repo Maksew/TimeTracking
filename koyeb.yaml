@@ -5,3 +5,12 @@ service:
     ports:
       - port: 8989
         protocol: http
+    env:
+      - name: SPRING_DATASOURCE_URL
+        value: "jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres"
+      - name: SPRING_DATASOURCE_USERNAME
+        value: "postgres"
+      - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: "update"
+      - name: SPRING_JPA_DATABASE_PLATFORM
+        value: "org.hibernate.dialect.PostgreSQLDialect"

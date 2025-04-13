@@ -1,10 +1,15 @@
-FROM maven:3.8.6-openjdk-21-slim as build
+# Build stage
+FROM eclipse-temurin:21-jdk-alpine AS builder
+
 WORKDIR /app
 COPY . .
-RUN mvn clean package -DskipTests
+RUN ./mvnw clean package
 
-FROM openjdk:21-slim
-COPY --from=build /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
+# Run stage
+FROM eclipse-temurin:21-jdk-alpine AS runner
+
+WORKDIR /app
+COPY --from=builder /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
+
 ENV PORT=8989
-EXPOSE 8989
-CMD ["java", "-Dserver.port=${PORT}", "-jar", "/app.jar"]
+CMD ["java", "-Dserver.port=${PORT}", "-jar", "app.jar"]
