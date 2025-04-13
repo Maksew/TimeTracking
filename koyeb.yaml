@@ -1,0 +1,4 @@
+name: timetracking
+builder:
+  build_dir: backend
+  buildpack: java
