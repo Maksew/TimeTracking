@@ -39,6 +39,17 @@ public class UserGroupService {
     }
 
     /**
+     * Vérifie si un utilisateur est membre d'un groupe (quel que soit son rôle)
+     * @param userId ID de l'utilisateur
+     * @param groupId ID du groupe
+     * @return true si l'utilisateur est membre du groupe, false sinon
+     */
+    public boolean isGroupMember(Integer userId, Integer groupId) {
+        Optional<UserGroup> userGroup = userGroupRepository.findById(new UserGroupId(userId, groupId));
+        return userGroup.isPresent();
+    }
+
+    /**
      * Récupère le rôle d'un utilisateur dans un groupe
      * @param userId ID de l'utilisateur
      * @param groupId ID du groupe

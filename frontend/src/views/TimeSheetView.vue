@@ -380,6 +380,12 @@ const canEditTimeSheet = (template) => {
     return true;
   }
 
+  // Cas 1bis: C'est une feuille "personnelle" (pas de groupe associé)
+  // Les feuilles personnelles doivent toujours être modifiables par l'utilisateur
+  if (!template.sharedWithGroups || template.sharedWithGroups.length === 0) {
+    return true;
+  }
+
   // Cas 2: C'est une feuille partagée avec un groupe
   if (template.sharedWithGroups && template.sharedWithGroups.length > 0) {
     const groupId = template.sharedWithGroups[0].groupId;

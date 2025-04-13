@@ -296,14 +296,32 @@ public class TimeSheetController {
             @RequestParam String accessLevel,
             Authentication authentication) {
         try {
-            // Vérifier les permissions
-            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body("Vous n'avez pas la permission de partager cette feuille de temps");
+            JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+            Integer userId = userDetails.getId();
+
+            // Récupérer la feuille de temps
+            Optional<TimeSheet> timeSheetOpt = timeSheetService.getTimeSheetById(timeSheetId);
+            if (timeSheetOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
             }
 
-            timeSheetService.shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel);
-            return ResponseEntity.ok().build();
+            TimeSheet timeSheet = timeSheetOpt.get();
+
+            // Vérifier si l'utilisateur est le propriétaire de la feuille de temps
+            boolean isOwner = timeSheet.getUser() != null && timeSheet.getUser().getId().equals(userId);
+
+            // Vérifier si l'utilisateur est membre du groupe
+            boolean isMember = userGroupService.isGroupMember(userId, groupId);
+
+            // Autoriser le partage si l'utilisateur est le propriétaire de la feuille
+            // ET qu'il est membre du groupe (même s'il n'en est pas le propriétaire)
+            if (isOwner && isMember) {
+                timeSheetService.shareTimeSheetWithGroup(timeSheetId, groupId, accessLevel);
+                return ResponseEntity.ok().build();
+            } else {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Vous n'avez pas la permission de partager cette feuille de temps avec ce groupe");
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

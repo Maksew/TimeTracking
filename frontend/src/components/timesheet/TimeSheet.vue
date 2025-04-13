@@ -62,7 +62,6 @@
           </v-chip-group>
         </div>
 
-        <!-- NOUVEAU COMPOSANT DE PÉRIODE DE VALIDITÉ -->
         <ValidityPeriodSelector
           :initial-start-date="startDate"
           :initial-end-date="endDate"
@@ -139,6 +138,7 @@
             prepend-inner-icon="mdi-account-group"
             clearable
           ></v-select>
+          <div class="text-caption mt-1">{{ getGroupHelperText }}</div>
         </div>
       </v-card-text>
 
@@ -161,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue';
+import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import Sortable from 'sortablejs';
 import timeSheetService from '@/services/timeSheetService';
@@ -362,14 +362,33 @@ async function loadTemplate(id) {
   }
 }
 
-async function loadUserGroups() {
+const loadUserGroups = async () => {
   try {
+    // Récupérer tous les groupes de l'utilisateur
     const groups = await groupService.getUserGroups();
-    userGroups.value = groups;
+
+    // Aucun filtrage - afficher tous les groupes dont l'utilisateur est membre
+    userGroups.value = groups.map(group => ({
+      id: group.id,
+      name: group.name
+    }));
+
+    console.log("Groupes disponibles pour le partage:", userGroups.value);
   } catch (error) {
     console.error('Erreur lors du chargement des groupes:', error);
   }
-}
+};
+
+const getGroupHelperText = computed(() => {
+  if (selectedGroup.value === 'personnel') {
+    return "Cette feuille sera visible uniquement par vous.";
+  } else if (selectedGroup.value) {
+    return "Cette feuille sera partagée avec tous les membres du groupe sélectionné.";
+  }
+  return "Sélectionnez un groupe pour partager cette feuille de temps.";
+});
+
+
 
 function addTask() {
   tasks.value.push({ id: nextTaskId.value++, name: '', duration: 0 }); // Toujours commencer à 0
@@ -383,7 +402,9 @@ function removeTask(index) {
 
 function goBack() {
   if (unsavedChanges.value) {
-    showSavePrompt.value = true;
+    if (confirm("Vous avez des modifications non sauvegardées. Voulez-vous vraiment quitter ?")) {
+      router.back();
+    }
   } else {
     router.back();
   }
