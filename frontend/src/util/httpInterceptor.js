@@ -1,6 +1,7 @@
 // src/util/httpInterceptor.js
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { API_BASE_URL } from '@/config/api.config';
 
 /**
  * Intercepteur HTTP pour ajouter le token JWT aux requêtes
@@ -68,7 +69,7 @@ export async function httpInterceptor(url, options = {}) {
  */
 export async function doAjaxRequestWithAuth(url, options = {}) {
   const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
-  const fullUrl = new URL(url, baseUrl).toString();
+  const fullUrl = new URL(url, API_BASE_URL).toString();
 
   console.log(`Envoi de requête à: ${fullUrl}`);
   console.log('Options:', JSON.stringify({
