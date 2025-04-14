@@ -21,6 +21,7 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         String[] allowedOrigins = {
                 "https://time-tracking.koyeb.app",
+                "https://intermediate-pansie-maksew-0cc92781.koyeb.app",
                 "http://localhost:5173"
         };
 

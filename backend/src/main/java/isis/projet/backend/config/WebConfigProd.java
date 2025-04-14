@@ -30,6 +30,9 @@ public class WebConfigProd implements WebMvcConfigurer {
         config.addAllowedOrigin("*");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
+        config.addAllowedOrigin("https://time-tracking.koyeb.app");
+        config.addAllowedOrigin("https://intermediate-pansie-maksew-0cc92781.koyeb.app");
+        config.addAllowedOrigin("http://localhost:5173");
         config.setAllowCredentials(false); // Important: passer à false avec addAllowedOrigin("*")
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);

@@ -67,8 +67,8 @@ export async function httpInterceptor(url, options = {}) {
  * Traite les réponses et gère les erreurs courantes
  */
 export async function doAjaxRequestWithAuth(url, options = {}) {
-  const baseUrl = 'https://time-tracking.koyeb.app';
-  const fullUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `${baseUrl}${url}`;
+  const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
+  const fullUrl = new URL(url, baseUrl).toString();
 
   console.log(`Envoi de requête à: ${fullUrl}`);
   console.log('Options:', JSON.stringify({
