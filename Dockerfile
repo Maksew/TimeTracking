@@ -13,11 +13,13 @@ COPY --from=builder /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
 # Force les paramètres PostgreSQL avec -D directement au lancement
 CMD ["java", \
+     "-Dspring.profiles.active=deploy", \   <-- AJOUTER CETTE LIGNE
      "-Dspring.datasource.url=jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres", \
      "-Dspring.datasource.username=${DB_USERNAME}", \
      "-Dspring.datasource.password=${DB_PASSWORD}", \
      "-Dspring.datasource.driver-class-name=org.postgresql.Driver", \
      "-Dspring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect", \
      "-Dspring.h2.console.enabled=false", \
+     "-Dspring.autoconfigure.exclude=org.springframework.boot.autoconfigure.h2.H2ConsoleAutoConfiguration", \
      "-Dserver.port=${SERVER_PORT}", \
      "-jar", "app.jar"]
