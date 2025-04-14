@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
+const BASE_URL = 'https://time-tracking.koyeb.app';
 
 function getAuthToken() {
   const token = localStorage.getItem('token');
