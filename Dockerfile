@@ -11,9 +11,11 @@ FROM eclipse-temurin:21-jdk-alpine AS runner
 WORKDIR /app
 COPY --from=builder /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
+ENV SPRING_PROFILES_ACTIVE=deploy
+
 # Force les paramètres PostgreSQL avec -D directement au lancement
 CMD ["java", \
-     "-Dspring.profiles.active=deploy", \   <-- AJOUTER CETTE LIGNE
+     "-Dspring.profiles.active=deploy", \
      "-Dspring.datasource.url=jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres", \
      "-Dspring.datasource.username=${DB_USERNAME}", \
      "-Dspring.datasource.password=${DB_PASSWORD}", \
