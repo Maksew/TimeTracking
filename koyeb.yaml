@@ -12,7 +12,7 @@ service:
         value: "jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres"
       - name: DB_USERNAME
         value: "postgres"
-      - name: SPRING_DATASOURCE_PASSWORD
+      - name: DB_PASSWORD
         secret: SUPABASE_PASSWORD
       - name: SERVER_PORT
         value: "8989"
