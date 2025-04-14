@@ -15,11 +15,12 @@ public class WebConfigProd implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins("*") // Autorise toutes les origines pour le déploiement
+        registry.addMapping("/**")
+                .allowedOrigins("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(false); // Doit être false lorsque allowedOrigins contient "*"
+                .maxAge(3600)
+                .allowCredentials(false);
     }
 
     @Bean
