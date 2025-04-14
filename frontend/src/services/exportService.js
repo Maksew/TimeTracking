@@ -1,7 +1,6 @@
-// src/services/exportService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8989';
+const BASE_URL = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
 
 function getAuthToken() {
   const token = localStorage.getItem('token');

@@ -10,6 +10,9 @@ export async function httpInterceptor(url, options = {}) {
   const authStore = useAuthStore()
   const router = useRouter()
 
+  console.log(`Envoi d'une requête à ${url}`);
+  console.log('Options:', { ...options, headers: options.headers });
+
   // Si l'utilisateur est authentifié, ajouter le token aux en-têtes
   if (authStore.isAuthenticated) {
     options.headers = {
@@ -20,6 +23,12 @@ export async function httpInterceptor(url, options = {}) {
 
   try {
     const response = await fetch(url, options)
+
+    console.log(`Réponse reçue de ${url}:`, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries([...response.headers])
+    });
 
     // Si le token est expiré (401), tenter de le rafraîchir
     if (response.status === 401 && authStore.isAuthenticated) {
@@ -58,7 +67,7 @@ export async function httpInterceptor(url, options = {}) {
  * Traite les réponses et gère les erreurs courantes
  */
 export async function doAjaxRequestWithAuth(url, options = {}) {
-  const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app'; // Base URL de votre API
+  const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
   const response = await httpInterceptor(fullUrl, options);

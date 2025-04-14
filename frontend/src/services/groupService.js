@@ -1,5 +1,3 @@
-// src/services/groupService.js - Version corrigée
-
 import { doAjaxRequestWithAuth } from '@/util/httpInterceptor'
 import { useAuthStore } from '@/stores/auth'
 
