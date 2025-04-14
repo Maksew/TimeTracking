@@ -3,9 +3,6 @@
     <!-- Message de bienvenue personnalisé -->
     <WelcomeMessage :username="user ? user.pseudo : ''" />
 
-    <!-- Date -->
-    <h2 class="date-header">Aujourd'hui, {{ currentDate }}</h2>
-
     <!-- État de chargement -->
     <v-overlay v-if="loading" class="d-flex align-center justify-center">
       <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>

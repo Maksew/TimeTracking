@@ -2,6 +2,8 @@
 import { ref, onMounted, computed, onUnmounted } from 'vue';
 import statisticsService from '@/services/statisticsService';
 import timeSheetService from '@/services/timeSheetService';
+import taskService from '@/services/taskService';
+import groupService from '@/services/groupService';
 
 // États pour le chargement
 const loading = ref(true);
@@ -10,28 +12,77 @@ const error = ref(null);
 // Statistiques
 const statistics = ref(null);
 const timeSheets = ref([]);
+const allTimeSheetTasks = ref([]);
 const refreshInterval = ref(null);
+const userGroups = ref([]);
 
-// Compteurs calculés
-const tasksToDo = computed(() => {
-  if (!statistics.value) return 0;
+// Chargement des données nécessaires
+const loadAllData = async (silent = false) => {
+  try {
+    if (!silent) loading.value = true;
+    error.value = null;
 
-  if (statistics.value.summary) {
-    // Compter les tâches qui n'ont ni durée > 0 ni ne sont explicitement marquées comme complétées
-    const totalTasks = statistics.value.summary.totalTasks || 0;
-    const completedTasks = statistics.value.summary.completedTasks || 0;
+    // 1. Charger les statistiques standard de l'utilisateur
+    statistics.value = await statisticsService.getCurrentUserStatistics();
 
-    return totalTasks - completedTasks;
+    // 2. Charger les groupes de l'utilisateur
+    userGroups.value = await groupService.getUserGroups();
+
+    // 3. Récupérer les feuilles personnelles et partagées avec l'utilisateur
+    const [ownedTimeSheets, sharedTimeSheets] = await Promise.all([
+      timeSheetService.getUserTimeSheets(),
+      timeSheetService.getSharedTimeSheets()
+    ]);
+
+    // 4. Récupérer les feuilles partagées avec les groupes de l'utilisateur
+    const groupPromises = userGroups.value.map(group =>
+      timeSheetService.getGroupTimeSheets(group.id)
+    );
+    const groupSheets = await Promise.all(groupPromises);
+
+    // 5. Fusionner toutes les feuilles (en éliminant les doublons)
+    let allSheets = [...ownedTimeSheets, ...sharedTimeSheets];
+    groupSheets.forEach(groupSheet => {
+      if (Array.isArray(groupSheet)) {
+        allSheets = [...allSheets, ...groupSheet];
+      }
+    });
+
+    // Dédupliquer par ID
+    const uniqueSheets = [...new Map(allSheets.map(sheet => [sheet.id, sheet])).values()];
+    timeSheets.value = uniqueSheets;
+
+    // 6. Extraire toutes les tâches de ces feuilles
+    const allTasks = [];
+    uniqueSheets.forEach(sheet => {
+      if (sheet.timeSheetTasks && Array.isArray(sheet.timeSheetTasks)) {
+        allTasks.push(...sheet.timeSheetTasks);
+      }
+    });
+    allTimeSheetTasks.value = allTasks;
+
+    if (!silent) loading.value = false;
+  } catch (err) {
+    console.error('Erreur lors du chargement des statistiques:', err);
+    error.value = err.message || 'Erreur lors du chargement des données';
+    if (!silent) loading.value = false;
   }
-  return 0;
+};
+
+// Compteurs calculés incluant TOUTES les feuilles (personnelles + groupes)
+const tasksToDo = computed(() => {
+  const allTasks = allTimeSheetTasks.value.length;
+  const completedTasks = allTimeSheetTasks.value.filter(task =>
+    task.completed || (task.duration && task.duration > 0)
+  ).length;
+
+  return allTasks - completedTasks;
 });
 
 const tasksCompleted = computed(() => {
-  if (!statistics.value) return 0;
-
-  // Une tâche est considérée comme complétée si elle a une durée > 0
-  // OU si elle est explicitement marquée comme complétée
-  return statistics.value.summary ? statistics.value.summary.completedTasks : 0;
+  return allTimeSheetTasks.value.filter(task =>
+    task.completed || (task.duration && task.duration > 0)
+  ).length;
 });
 
 // Formatage du temps total en secondes pour l'affichage
@@ -46,29 +97,17 @@ const formatTimeWorked = (seconds) => {
 };
 
 const timeWorked = computed(() => {
-  if (!statistics.value) return '00:00:00';
-  return formatTimeWorked(statistics.value.summary ? statistics.value.summary.totalTimeInMinutes : 0);
+  // Calculer le temps total à partir de toutes les tâches
+  const totalSeconds = allTimeSheetTasks.value.reduce((sum, task) => {
+    return sum + (task.duration || 0);
+  }, 0);
+
+  return formatTimeWorked(totalSeconds);
 });
 
 // Fonction de rafraîchissement des données
 const refreshData = async (silent = false) => {
-  try {
-    if (!silent) loading.value = true;
-
-    // Charger les statistiques de l'utilisateur connecté
-    const statsData = await statisticsService.getCurrentUserStatistics();
-    statistics.value = statsData;
-
-    // Charger les feuilles de temps pour avoir des données supplémentaires si nécessaire
-    const timeSheetsData = await timeSheetService.getUserTimeSheets();
-    timeSheets.value = timeSheetsData;
-
-  } catch (err) {
-    console.error('Erreur lors du chargement des statistiques:', err);
-    error.value = err.message || 'Erreur lors du chargement des données';
-  } finally {
-    if (!silent) loading.value = false;
-  }
+  await loadAllData(silent);
 };
 
 // Exposer la méthode de rafraîchissement pour le parent
