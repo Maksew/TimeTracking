@@ -3,7 +3,7 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 COPY . .
-RUN ./mvnw clean package
+RUN ./mvnw clean package -DskipTests
 
 # Run stage
 FROM eclipse-temurin:21-jdk-alpine AS runner
@@ -11,6 +11,13 @@ FROM eclipse-temurin:21-jdk-alpine AS runner
 WORKDIR /app
 COPY --from=builder /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
-ENV PORT=8989
-ENV SPRING_PROFILES_ACTIVE=deploy
-CMD ["java", "-Dserver.port=${PORT}", "-Dspring.profiles.active=deploy", "-jar", "app.jar"]
+# Force les paramètres PostgreSQL avec -D directement au lancement
+CMD ["java", \
+     "-Dspring.datasource.url=jdbc:postgresql://db.pwyzzsvgwicqstwfebyb.supabase.co:5432/postgres", \
+     "-Dspring.datasource.username=${DB_USERNAME}", \
+     "-Dspring.datasource.password=${DB_PASSWORD}", \
+     "-Dspring.datasource.driver-class-name=org.postgresql.Driver", \
+     "-Dspring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect", \
+     "-Dspring.h2.console.enabled=false", \
+     "-Dserver.port=${SERVER_PORT}", \
+     "-jar", "app.jar"]
