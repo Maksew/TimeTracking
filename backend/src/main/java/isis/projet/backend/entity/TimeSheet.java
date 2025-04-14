@@ -2,7 +2,6 @@ package isis.projet.backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import isis.projet.backend.security.converter.AttributeEncryptor;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -27,7 +26,6 @@ public class TimeSheet {
     private String icon;
 
     @Column(name = "title", length = 100)
-    @Convert(converter = AttributeEncryptor.class)   // Encrypt this sensitive field
     private String title;
 
     @Column(name = "start_date")
