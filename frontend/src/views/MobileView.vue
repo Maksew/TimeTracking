@@ -1,30 +1,30 @@
 <template>
   <v-card color="#283593" dark class="rounded-lg timesheet-card">
-    <!-- Card Header -->
+    <!-- Header -->
     <v-card-title class="d-flex align-center">
       <v-icon size="small" class="mr-2">mdi-file-document-outline</v-icon>
       Feuille de temps
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-btn icon small to="/editTimesheet" class="ml-2">
         <v-icon>mdi-plus</v-icon>
-        <v-tooltip activator="parent" location="bottom">Nouvelle feuille</v-tooltip>
+        <v-tooltip activator="parent" location="bottom">
+          Nouvelle feuille
+        </v-tooltip>
       </v-btn>
     </v-card-title>
-    <v-divider></v-divider>
+    <v-divider />
 
-    <!-- Loading indicator -->
+    <!-- Loading and Error States -->
     <div v-if="loading" class="d-flex justify-center align-center my-5">
-      <v-progress-circular indeterminate color="white"></v-progress-circular>
+      <v-progress-circular indeterminate color="white" />
     </div>
-
-    <!-- Error message -->
     <div v-else-if="error" class="pa-4">
       <v-alert type="error" text dense>{{ error }}</v-alert>
     </div>
 
-    <!-- Main content -->
+    <!-- Main Content -->
     <template v-else>
-      <!-- Chronometer Section -->
+      <!-- Timer Section -->
       <div class="d-flex justify-center align-center py-4">
         <div class="text-h3 font-weight-bold timer">
           {{ formattedTimerDisplay }}
@@ -38,54 +38,40 @@
             @click="startTimer"
           >
             <v-icon>mdi-play</v-icon>
-            <v-tooltip activator="parent" location="bottom">Démarrer</v-tooltip>
+            <v-tooltip activator="parent" location="bottom">
+              Démarrer
+            </v-tooltip>
           </v-btn>
         </template>
         <template v-else>
-          <v-btn
-            icon
-            class="ml-4 stop-btn"
-            color="red"
-            @click="stopTimer"
-          >
+          <v-btn icon class="ml-4 stop-btn" color="red" @click="stopTimer">
             <v-icon>mdi-stop</v-icon>
-            <v-tooltip activator="parent" location="bottom">Arrêter</v-tooltip>
+            <v-tooltip activator="parent" location="bottom">
+              Arrêter
+            </v-tooltip>
           </v-btn>
         </template>
       </div>
 
-      <!-- Selected Task Information (inline) -->
+      <!-- Selected Task Information -->
       <div v-if="selectedTask" class="selected-task-banner mx-4 mb-4">
         <div class="d-flex align-center">
-          <v-icon size="small" class="mr-2">
-            {{ selectedTimeSheet?.icon || 'mdi-file-document' }}
-          </v-icon>
+          <v-icon :icon="selectedTimeSheet?.icon || 'mdi-file-document'" class="mr-2" size="small" />
           <span class="font-weight-medium">{{ selectedTimeSheet?.title }}</span>
           <v-icon class="mx-2" size="small">mdi-chevron-right</v-icon>
           <span class="task-name">{{ selectedTask.name }}</span>
         </div>
       </div>
-
-      <!-- Fixed-position indicator for selected task -->
       <div v-if="selectedTask" class="task-selection-indicator">
         <span>Tâche sélectionnée : {{ selectedTask.name }}</span>
       </div>
 
+      <!-- Card Text: Options, Filters, and Timesheet List -->
       <v-card-text>
-        <!-- Auto-chain tasks option -->
+        <!-- Auto-chain Tasks Option -->
         <div class="auto-chain-option mb-3">
-          <v-checkbox
-            v-model="autoChainTasks"
-            label="Enchaîner automatiquement les tâches"
-            color="white"
-            hide-details
-          >
-            <template v-slot:label>
-              <div @click.stop>Enchaîner automatiquement les tâches</div>
-            </template>
-          </v-checkbox>
+          <AutoChainOption v-model="autoChainTasks" />
         </div>
-
         <!-- Filters -->
         <div class="d-flex flex-wrap mb-3">
           <v-select
@@ -99,8 +85,7 @@
             bg-color="#1a237e"
             hide-details
             class="group-select mr-2"
-          ></v-select>
-
+          />
           <v-select
             v-model="validityFilter"
             :items="validityFilterOptions"
@@ -110,19 +95,17 @@
             bg-color="#1a237e"
             hide-details
             class="validity-select"
-          ></v-select>
+          />
         </div>
-
-        <!-- Current Group Label -->
+        <!-- Group Label -->
         <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
-          <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
+          <span class="font-weight-medium" :class="{ 'personal-label': selectedGroup === 'personnel' }">
             {{ currentGroupLabel }}
-            <span v-if="filteredTimeSheets.length > 0"> - {{ filteredTimeSheets.length }}
-              {{ filteredTimeSheets.length > 1 ? 'feuilles' : 'feuille' }}
+            <span v-if="filteredTimeSheets.length > 0">
+              - {{ filteredTimeSheets.length }} {{ filteredTimeSheets.length > 1 ? 'feuilles' : 'feuille' }}
             </span>
           </span>
         </div>
-
         <!-- Timesheet List -->
         <div class="timesheet-container">
           <template v-if="filteredTimeSheets.length > 0">
@@ -135,9 +118,7 @@
               >
                 <v-expansion-panel-title>
                   <div class="d-flex align-center">
-                    <v-icon size="small" class="mr-2">
-                      {{ timeSheet.icon || 'mdi-file-document' }}
-                    </v-icon>
+                    <v-icon :icon="timeSheet.icon || 'mdi-file-document'" class="mr-2" />
                     <span>{{ timeSheet.title }}</span>
                     <v-chip class="ml-2" size="small" color="primary">
                       {{ timeSheet.timeSheetTasks?.length || 0 }} tâches
@@ -187,7 +168,7 @@
                         height="4"
                         rounded
                         :color="getProgressColor(timeSheet)"
-                      ></v-progress-linear>
+                      />
                     </div>
                   </template>
                   <v-list bg-color="transparent">
@@ -207,11 +188,9 @@
                           color="success"
                           hide-details
                           @click.stop="toggleTaskCompleted($event, task, !(task.completed || task.duration > 0))"
-                        ></v-checkbox-btn>
+                        />
                       </template>
-                      <v-list-item-title
-                        :class="{ 'text-decoration-line-through': task.completed || task.duration > 0 }"
-                      >
+                      <v-list-item-title :class="{ 'text-decoration-line-through': task.completed || task.duration > 0 }">
                         {{ task.name }}
                       </v-list-item-title>
                       <template v-slot:append>
@@ -226,7 +205,9 @@
                             @click.stop="editTaskTime(timeSheet, task)"
                           >
                             <v-icon size="small">mdi-pencil</v-icon>
-                            <v-tooltip activator="parent" location="top">Modifier le temps</v-tooltip>
+                            <v-tooltip activator="parent" location="top">
+                              Modifier le temps
+                            </v-tooltip>
                           </v-btn>
                         </div>
                       </template>
@@ -249,155 +230,57 @@
       </v-card-text>
     </template>
 
-    <!-- Confirmation Dialog for Time -->
-    <v-dialog v-model="showConfirmDialog" max-width="400" persistent>
-      <v-card color="#283593" dark>
-        <v-card-title class="text-h5">
-          <v-icon start class="mr-2">mdi-clock-check-outline</v-icon>
-          Confirmer le temps
-        </v-card-title>
-        <v-card-text class="pb-4 pt-4">
-          <p class="mb-2">Tâche : <strong>{{ selectedTask?.name }}</strong></p>
-          <p class="mb-4">Confirmez ou ajustez le temps passé sur cette tâche :</p>
-          <div class="time-display text-center mb-6">
-            <div class="text-h2 font-weight-bold">
-              {{ hours.toString().padStart(2, '0') }}:{{ minutes.toString().padStart(2, '0') }}:{{ seconds.toString().padStart(2, '0') }}
-            </div>
-            <div class="text-caption">Heures:Minutes:Secondes</div>
-          </div>
-          <v-row>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="hours"
-                label="Heures"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="minutes"
-                label="Minutes"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                max="59"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="4">
-              <v-text-field
-                v-model.number="seconds"
-                label="Secondes"
-                type="number"
-                variant="outlined"
-                bg-color="#1a237e"
-                min="0"
-                max="59"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="cancelConfirmation">
-            Annuler
-          </v-btn>
-          <v-btn color="primary" @click="saveConfirmedTime" :disabled="confirmedSeconds <= 0">
-            Enregistrer
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Asynchronous Success Notification -->
-    <transition name="fade">
-      <div v-if="statusMessage" class="success-notification">
-        <v-icon class="mr-2" color="white">mdi-check-circle</v-icon>
-        {{ statusMessage }}
-      </div>
-    </transition>
-
-    <!-- Reset Time Confirmation Dialog -->
-    <v-dialog v-model="resetTimeDialog" max-width="400" persistent>
-      <v-card color="#283593" dark>
-        <v-card-title class="headline">
-          <v-icon start class="mr-2">mdi-timer-off</v-icon>
-          Réinitialiser le temps
-        </v-card-title>
-        <v-card-text>
-          <p>Voulez-vous réinitialiser le temps passé sur cette tâche ?</p>
-          <p class="text-subtitle-2 mt-2" v-if="taskToReset">
-            <strong>{{ taskToReset.name }}</strong> - Temps actuel : {{ formatTime(taskToReset.duration) }}
-          </p>
-          <p class="text-caption mt-3">
-            <v-icon size="small" color="warning" class="mr-1">mdi-alert-circle</v-icon>
-            Cette action ne peut pas être annulée.
-          </p>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="cancelResetTime">
-            Annuler
-          </v-btn>
-          <v-btn color="error" @click="confirmResetTime">
-            Réinitialiser
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Warning Dialog for Task without Time -->
-    <v-dialog v-model="noTimeDialog" max-width="400">
-      <v-card color="#283593" dark>
-        <v-card-title class="headline">
-          <v-icon start class="mr-2" color="warning">mdi-alert-circle</v-icon>
-          Aucun temps enregistré
-        </v-card-title>
-        <v-card-text>
-          <p>Cette tâche n'a pas de temps enregistré.</p>
-          <p class="mt-2">Vous devez d'abord enregistrer du temps avec le chronomètre ou éditer manuellement la durée pour pouvoir la marquer comme complétée.</p>
-          <p class="text-subtitle-2 mt-3" v-if="taskToToggle">
-            <strong>{{ taskToToggle.name }}</strong>
-          </p>
-        </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="closeNoTimeDialog">
-            Fermer
-          </v-btn>
-          <v-btn color="primary" @click="editTaskTimeFromDialog">
-            <v-icon start class="mr-1">mdi-pencil</v-icon>
-            Éditer le temps
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- Dialogues -->
+    <ConfirmTimeDialog
+      v-model:visible="showConfirmDialog"
+      :hours="hours"
+      :minutes="minutes"
+      :seconds="seconds"
+      :selectedTaskName="selectedTask?.name || ''"
+      @cancel="cancelConfirmation"
+      @save="saveConfirmedTime"
+    />
+    <ResetTimeDialog
+      v-model:visible="resetTimeDialog"
+      :task="taskToReset"
+      :timeSheet="selectedTimeSheet"
+      @cancel="cancelResetTime"
+      @confirm="confirmResetTime"
+    />
+    <NoTimeDialog
+      v-model:visible="noTimeDialog"
+      :task="taskToToggle"
+      @close="closeNoTimeDialog"
+      @edit="editTaskTimeFromDialog"
+    />
+    <SuccessNotification v-if="statusMessage" :message="statusMessage" />
   </v-card>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, computed, onUnmounted, nextTick } from 'vue';
-import { defineEmits } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
 import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
+import { defineEmits } from 'vue';
+
+// Import sub-components
+import TimerDisplay from '@/components/mobile/TimerDisplay.vue';
+import TaskBanner from '@/components/mobile/TaskBanner.vue';
+import AutoChainOption from '@/components/mobile/AutoChainOption.vue';
+import Filters from '@/components/mobile/Filters.vue';
+import GroupLabel from '@/components/mobile/GroupLabel.vue';
+import TimesheetList from '@/components/mobile/TimesheetList.vue';
+import ConfirmTimeDialog from '@/components/mobile/ConfirmTimeDialog.vue';
+import ResetTimeDialog from '@/components/mobile/ResetTimeDialog.vue';
+import NoTimeDialog from '@/components/mobile/NoTimeDialog.vue';
+import SuccessNotification from '@/components/mobile/SuccessNotification.vue';
 
 const authStore = useAuthStore();
 const emit = defineEmits(['task-updated', 'data-changed']);
 
-/* =========
-   State Variables
-   ========= */
+/* === STATE VARIABLES === */
 const loading = ref(true);
 const error = ref(null);
 const statusMessage = ref('');
@@ -405,7 +288,6 @@ const processingTask = ref(false);
 const tasksMap = ref({});
 
 const timeSheets = ref([]);
-const allTasks = ref([]);
 const userGroups = ref([]);
 const selectedGroup = ref(null);
 const expandedPanels = ref([]);
@@ -436,31 +318,26 @@ const validityFilterOptions = [
   { title: 'À venir', value: 'upcoming' }
 ];
 
-/* =========
-   Computed Properties
-   ========= */
+/* === HELPER FUNCTIONS & COMPUTED PROPERTIES === */
 const groupColors = [
   'purple', 'deep-purple', 'indigo', 'blue',
   'deep-purple-darken-1', 'indigo-darken-1', 'blue-darken-1',
   'purple-lighten-1', 'deep-purple-lighten-1', 'indigo-lighten-1'
 ];
-
 const getGroupColor = (groupId) => {
   const numericId = typeof groupId === 'number' ? groupId : parseInt(groupId, 10);
   const colorIndex = (numericId || 0) % groupColors.length;
   return groupColors[colorIndex];
 };
 
-const groupOptions = computed(() => {
-  return [
-    { title: 'Tous', value: null },
-    { title: 'Personnel', value: 'personnel' },
-    ...userGroups.value.map(group => ({
-      title: group.name,
-      value: group.id
-    }))
-  ];
-});
+const groupOptions = computed(() => [
+  { title: 'Tous', value: null },
+  { title: 'Personnel', value: 'personnel' },
+  ...userGroups.value.map(group => ({
+    title: group.name,
+    value: group.id
+  }))
+]);
 
 const formattedTimerDisplay = computed(() => {
   const hrs = Math.floor(timerSeconds.value / 3600);
@@ -497,56 +374,40 @@ const filteredTimeSheets = computed(() => {
 });
 
 const currentGroupLabel = computed(() => {
-  if (selectedGroup.value === 'personnel') {
-    return 'Personnel';
-  } else if (!selectedGroup.value) {
-    return 'Toutes les feuilles';
-  } else {
-    const group = userGroups.value.find(g => g.id === selectedGroup.value);
-    return group ? group.name : 'Groupe sélectionné';
-  }
+  if (selectedGroup.value === 'personnel') return 'Personnel';
+  if (!selectedGroup.value) return 'Toutes les feuilles';
+  const group = userGroups.value.find(g => g.id === selectedGroup.value);
+  return group ? group.name : 'Groupe sélectionné';
 });
 
-/* =========
-   Functions: Loading & Processing Data
-   ========= */
+/* === API LOADING & PROCESSING === */
 const loadTimeSheets = async () => {
   try {
     loading.value = true;
     error.value = null;
-
-    // Load user groups
+    // Load groups
     const groups = await groupService.getUserGroups();
     userGroups.value = groups;
-
-    // Load all tasks for fast reference
+    // Load tasks
     const allTasksFetched = await taskService.getAllTasks();
     const tasksByIdMap = {};
-    allTasksFetched.forEach(task => {
-      tasksByIdMap[task.id] = task;
-    });
+    allTasksFetched.forEach(task => tasksByIdMap[task.id] = task);
     tasksMap.value = tasksByIdMap;
-
-    // Retrieve personal and directly shared timesheets
+    // Load timesheets: owned and shared directly
     const [ownedTimeSheets, sharedTimeSheets] = await Promise.all([
       timeSheetService.getUserTimeSheets(),
       timeSheetService.getSharedTimeSheets()
     ]);
-
-    // Retrieve group shared timesheets
-    const groupSharedTimeSheetsPromises = [];
-    for (const group of groups) {
-      groupSharedTimeSheetsPromises.push(timeSheetService.getGroupTimeSheets(group.id));
-    }
-    const groupSharedTimeSheetsResults = await Promise.all(groupSharedTimeSheetsPromises);
-
-    let allTimeSheetsArr = [...ownedTimeSheets, ...sharedTimeSheets];
-    groupSharedTimeSheetsResults.forEach(groupSheets => {
+    // Load timesheets shared via groups
+    const groupPromises = groups.map(group => timeSheetService.getGroupTimeSheets(group.id));
+    const groupResults = await Promise.all(groupPromises);
+    let allTimeSheets = [...ownedTimeSheets, ...sharedTimeSheets];
+    groupResults.forEach(groupSheets => {
       if (Array.isArray(groupSheets)) {
-        allTimeSheetsArr = [...allTimeSheetsArr, ...groupSheets];
+        allTimeSheets = [...allTimeSheets, ...groupSheets];
       }
     });
-    const uniqueTimeSheets = [...new Map(allTimeSheetsArr.map(sheet => [sheet.id, sheet])).values()];
+    const uniqueTimeSheets = [...new Map(allTimeSheets.map(sheet => [sheet.id, sheet])).values()];
     const processedTimeSheets = uniqueTimeSheets.map(sheet => {
       if (!sheet.title) {
         sheet.title = `Feuille du ${new Date(sheet.entryDate).toLocaleDateString()}`;
@@ -554,12 +415,7 @@ const loadTimeSheets = async () => {
       if (sheet.timeSheetTasks) {
         sheet.timeSheetTasks = sheet.timeSheetTasks.map(task => {
           const taskDetails = tasksMap.value[task.taskId];
-          if (taskDetails) {
-            task.name = taskDetails.name;
-            task.repetition = taskDetails.repetition;
-          } else {
-            task.name = `Tâche #${task.taskId}`;
-          }
+          task.name = taskDetails ? taskDetails.name : `Tâche #${task.taskId}`;
           return task;
         });
       }
@@ -567,8 +423,9 @@ const loadTimeSheets = async () => {
       return sheet;
     });
     timeSheets.value = processedTimeSheets;
+    console.log(`Chargement terminé: ${processedTimeSheets.length} feuilles`);
   } catch (err) {
-    console.error('Erreur lors du chargement des feuilles de temps:', err);
+    console.error('Erreur lors du chargement:', err);
     error.value = 'Impossible de charger les feuilles de temps';
   } finally {
     loading.value = false;
@@ -594,11 +451,12 @@ const selectTask = (timeSheet, task) => {
   processingTask.value = true;
   setTimeout(() => {
     try {
-      if (selectedTask.value && selectedTask.value.taskId === task.taskId &&
-        selectedTimeSheet.value && selectedTimeSheet.value.id === timeSheet.id) {
+      if (selectedTask.value &&
+        selectedTask.value.taskId === task.taskId &&
+        selectedTimeSheet.value &&
+        selectedTimeSheet.value.id === timeSheet.id) {
         if (timerRunning.value) {
-          const confirmStop = confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et désélectionner cette tâche?");
-          if (!confirmStop) {
+          if (!confirm("Un chronométrage est en cours. Voulez-vous l'arrêter?")) {
             processingTask.value = false;
             return;
           }
@@ -611,8 +469,7 @@ const selectTask = (timeSheet, task) => {
         selectedTimeSheet.value = null;
       } else {
         if (timerRunning.value) {
-          const confirmSwitch = confirm("Un chronométrage est en cours. Voulez-vous l'arrêter et passer à cette tâche?");
-          if (!confirmSwitch) {
+          if (!confirm("Un chronométrage est en cours. Voulez-vous passer à cette tâche?")) {
             processingTask.value = false;
             return;
           }
@@ -625,11 +482,9 @@ const selectTask = (timeSheet, task) => {
         selectedTask.value = task;
       }
     } catch (err) {
-      console.error('Erreur lors de la sélection/désélection de tâche:', err);
+      console.error("Erreur dans selectTask:", err);
     } finally {
-      setTimeout(() => {
-        processingTask.value = false;
-      }, 300);
+      setTimeout(() => processingTask.value = false, 300);
     }
   }, 0);
 };
@@ -654,23 +509,21 @@ const updateTotalSeconds = () => {
     minutes.value = adjustedMinutes;
     hours.value = h + additionalHours;
   }
-  confirmedSeconds.value = (h * 3600) + (adjustedMinutes * 60) + adjustedSeconds;
+  confirmedSeconds.value = h * 3600 + adjustedMinutes * 60 + adjustedSeconds;
 };
 
 const updateTimeFields = () => {
-  const totalSeconds = confirmedSeconds.value || 0;
-  hours.value = Math.floor(totalSeconds / 3600);
-  minutes.value = Math.floor((totalSeconds % 3600) / 60);
-  seconds.value = totalSeconds % 60;
+  const total = confirmedSeconds.value || 0;
+  hours.value = Math.floor(total / 3600);
+  minutes.value = Math.floor((total % 3600) / 60);
+  seconds.value = total % 60;
 };
 
 const startTimer = () => {
   if (!selectedTask.value || timerRunning.value) return;
   timerRunning.value = true;
   timerSeconds.value = 0;
-  timerInterval.value = setInterval(() => {
-    timerSeconds.value++;
-  }, 1000);
+  timerInterval.value = setInterval(() => timerSeconds.value++, 1000);
 };
 
 const stopTimer = () => {
@@ -693,9 +546,7 @@ const saveConfirmedTime = async () => {
           selectedTask.value.taskId,
           confirmedSeconds.value
         );
-        if (selectedTask.value) {
-          selectedTask.value.duration = confirmedSeconds.value;
-        }
+        if (selectedTask.value) selectedTask.value.duration = confirmedSeconds.value;
         emit('task-updated', {
           timeSheetId: selectedTimeSheet.value.id,
           taskId: selectedTask.value.taskId,
@@ -712,29 +563,19 @@ const saveConfirmedTime = async () => {
           selectedTask.value = null;
           selectedTimeSheet.value = null;
         }
-        setTimeout(() => {
-          statusMessage.value = '';
-        }, 3000);
+        setTimeout(() => statusMessage.value = '', 3000);
         await loadTimeSheets();
         emit('data-changed');
       } catch (innerErr) {
-        console.error('Erreur lors de la mise à jour de la durée:', innerErr);
+        console.error("Erreur dans saveConfirmedTime:", innerErr);
         error.value = 'Erreur lors de la mise à jour: ' + (innerErr.message || 'Erreur inconnue');
       }
     }, 100);
   } catch (err) {
-    console.error('Erreur lors de la sauvegarde du temps:', err);
+    console.error("Erreur dans saveConfirmedTime:", err);
     error.value = 'Erreur lors de la sauvegarde: ' + (err.message || 'Erreur inconnue');
   }
 };
-
-const refreshData = async (silent = false) => {
-  if (!silent) loading.value = true;
-  await loadTimeSheets();
-  if (!silent) loading.value = false;
-};
-
-defineExpose({ refreshData });
 
 const cancelConfirmation = () => {
   showConfirmDialog.value = false;
@@ -773,10 +614,144 @@ const toggleTaskCompleted = async (event, task, completed) => {
     emit('data-changed');
     await refreshData(true);
   } catch (err) {
-    console.error('Erreur lors de la mise à jour de l\'état de la tâche:', err);
-    error.value = 'Erreur lors de la mise à jour de l\'état de la tâche';
+    console.error("Erreur dans toggleTaskCompleted:", err);
+    error.value = "Erreur lors de la mise à jour de l'état de la tâche";
   }
 };
+
+const moveToNextTask = () => {
+  if (!selectedTimeSheet.value) return;
+  const tasks = selectedTimeSheet.value.timeSheetTasks || [];
+  if (tasks.length === 0) return;
+  const currentIndex = tasks.findIndex(t => t.taskId === selectedTask.value?.taskId);
+  const nextIndex = (currentIndex + 1) % tasks.length;
+  setTimeout(() => selectTask(selectedTimeSheet.value, tasks[nextIndex]), 0);
+};
+
+const formatTime = (timeValue) => {
+  if (timeValue == null) return '00:00:00';
+  const total = timeValue;
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
+const getProgressPercentage = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return 0;
+  const start = new Date(sheet.startDate);
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  const total = end - start;
+  if (total <= 0) return 100;
+  if (now < start) return 0;
+  if (now > end) return 100;
+  const elapsed = now - start;
+  return Math.min(100, Math.floor((elapsed / total) * 100));
+};
+
+const getTimeRemainingText = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return 'Sans limite';
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  if (now > end) return 'Expirée';
+  const start = new Date(sheet.startDate);
+  if (now < start) return 'À venir';
+  const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  return days === 1 ? '1 jour restant' : `${days} jours restants`;
+};
+
+const getProgressColor = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return 'grey';
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  if (now > end) return 'error';
+  const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  if (days <= 2) return 'orange-darken-1';
+  if (days <= 7) return 'amber-lighten-1';
+  return 'success';
+};
+
+const getTimeRemainingClass = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return '';
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  if (now > end) return 'text-error';
+  const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  return days <= 2 ? 'text-orange' : '';
+};
+
+const getExpirationColor = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return 'grey';
+  const start = new Date(sheet.startDate);
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  if (now > end) return 'error';
+  if (now < start) return 'info';
+  const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  return days <= 2 ? 'warning' : 'success';
+};
+
+const getExpirationLabel = (sheet) => {
+  if (!sheet.startDate || !sheet.endDate) return '';
+  const start = new Date(sheet.startDate);
+  const end = new Date(sheet.endDate);
+  const now = new Date();
+  if (now > end) return 'Expirée';
+  if (now < start) return 'À venir';
+  const days = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  return days <= 2 ? `${days}j` : 'Active';
+};
+
+const refreshData = async (silent = false) => {
+  if (!silent) loading.value = true;
+  await loadTimeSheets();
+  if (!silent) loading.value = false;
+};
+
+defineExpose({ refreshData });
+
+onUnmounted(() => {
+  if (timerInterval.value) clearInterval(timerInterval.value);
+});
+onMounted(() => { loadTimeSheets(); });
+
+watch(selectedGroup, () => {
+  if (filteredTimeSheets.value.length === 0) {
+    selectedTimeSheet.value = null;
+    selectedTask.value = null;
+  } else if (
+    selectedTimeSheet.value &&
+    !filteredTimeSheets.value.some(ts => ts.id === selectedTimeSheet.value.id)
+  ) {
+    setSelectedTimeSheet(filteredTimeSheets.value[0]);
+  }
+});
+watch(validityFilter, () => {
+  if (filteredTimeSheets.value.length === 0) {
+    selectedTimeSheet.value = null;
+    selectedTask.value = null;
+  } else if (
+    selectedTimeSheet.value &&
+    !filteredTimeSheets.value.some(ts => ts.id === selectedTimeSheet.value.id)
+  ) {
+    setSelectedTimeSheet(filteredTimeSheets.value[0]);
+  }
+});
+watch(confirmedSeconds, updateTimeFields);
+watch([hours, minutes, seconds], updateTotalSeconds);
+
+
+
 
 const confirmResetTime = async () => {
   try {
@@ -798,8 +773,8 @@ const confirmResetTime = async () => {
     resetTimeDialog.value = false;
     taskToReset.value = null;
   } catch (err) {
-    console.error('Erreur lors de la réinitialisation du temps:', err);
-    error.value = 'Erreur lors de la réinitialisation du temps';
+    console.error("Erreur dans confirmResetTime:", err);
+    error.value = "Erreur lors de la réinitialisation du temps";
   }
 };
 
@@ -840,137 +815,6 @@ const editTaskTime = (timeSheet, task) => {
   showConfirmDialog.value = true;
 };
 
-const moveToNextTask = () => {
-  if (!selectedTimeSheet.value) return;
-  const tasks = selectedTimeSheet.value.timeSheetTasks || [];
-  if (tasks.length === 0) return;
-  const currentIndex = tasks.findIndex(t => t.taskId === selectedTask.value?.taskId);
-  let nextTaskIndex = (currentIndex + 1) % tasks.length;
-  setTimeout(() => {
-    selectTask(selectedTimeSheet.value, tasks[nextTaskIndex]);
-  }, 0);
-};
-
-const formatTime = (timeValue) => {
-  if (timeValue === null || timeValue === undefined) return '00:00:00';
-  const totalSeconds = timeValue;
-  const hrs = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-};
-
-const getProgressPercentage = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return 0;
-  const start = new Date(timeSheet.startDate);
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  const totalDuration = end - start;
-  if (totalDuration <= 0) return 100;
-  if (now < start) return 0;
-  if (now > end) return 100;
-  const elapsed = now - start;
-  return Math.min(100, Math.floor((elapsed / totalDuration) * 100));
-};
-
-const getTimeRemainingText = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return 'Sans limite';
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  if (now > end) return 'Expirée';
-  const start = new Date(timeSheet.startDate);
-  if (now < start) return 'À venir';
-  const daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  return daysRemaining === 1 ? '1 jour restant' : `${daysRemaining} jours restants`;
-};
-
-const getProgressColor = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return 'grey';
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  if (now > end) return 'error';
-  const daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  if (daysRemaining <= 2) return 'orange-darken-1';
-  if (daysRemaining <= 7) return 'amber-lighten-1';
-  return 'success';
-};
-
-const getTimeRemainingClass = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return '';
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  if (now > end) return 'text-error';
-  const daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  if (daysRemaining <= 2) return 'text-orange';
-  return '';
-};
-
-const getExpirationColor = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return 'grey';
-  const start = new Date(timeSheet.startDate);
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  if (now > end) return 'error';
-  if (now < start) return 'info';
-  const daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  if (daysRemaining <= 2) return 'warning';
-  return 'success';
-};
-
-const getExpirationLabel = (timeSheet) => {
-  if (!timeSheet.startDate || !timeSheet.endDate) return '';
-  const start = new Date(timeSheet.startDate);
-  const end = new Date(timeSheet.endDate);
-  const now = new Date();
-  if (now > end) return 'Expirée';
-  if (now < start) return 'À venir';
-  const daysRemaining = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  if (daysRemaining <= 2) return `${daysRemaining}j`;
-  return 'Active';
-};
-
-onUnmounted(() => {
-  if (timerInterval.value) {
-    clearInterval(timerInterval.value);
-  }
-});
-
-onMounted(() => {
-  loadTimeSheets();
-});
-
-watch(selectedGroup, () => {
-  if (filteredTimeSheets.value.length === 0) {
-    selectedTimeSheet.value = null;
-    selectedTask.value = null;
-  } else if (selectedTimeSheet.value &&
-    !filteredTimeSheets.value.some(ts => ts.id === selectedTimeSheet.value.id)) {
-    setSelectedTimeSheet(filteredTimeSheets.value[0]);
-  }
-});
-
-watch(validityFilter, () => {
-  if (filteredTimeSheets.value.length === 0) {
-    selectedTimeSheet.value = null;
-    selectedTask.value = null;
-  } else if (selectedTimeSheet.value &&
-    !filteredTimeSheets.value.some(ts => ts.id === selectedTimeSheet.value.id)) {
-    setSelectedTimeSheet(filteredTimeSheets.value[0]);
-  }
-});
-
-watch(confirmedSeconds, updateTimeFields);
-watch([hours, minutes, seconds], updateTotalSeconds);
 </script>
 
 <style scoped>
@@ -980,10 +824,10 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   flex-direction: column;
 }
 
-/* Adjust select inputs for mobile */
 .group-select {
   max-width: 180px;
 }
+
 .validity-select {
   max-width: 150px;
 }
@@ -1001,14 +845,17 @@ watch([hours, minutes, seconds], updateTotalSeconds);
 .timesheet-container::-webkit-scrollbar {
   width: 8px;
 }
+
 .timesheet-container::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
   border-radius: 4px;
 }
+
 .timesheet-container::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 4px;
 }
+
 .timesheet-container::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
 }
@@ -1040,16 +887,20 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   background-color: rgba(76, 175, 80, 0.1) !important;
   transition: background-color 0.3s ease;
 }
+
 .task-completed:hover {
   background-color: rgba(76, 175, 80, 0.2) !important;
 }
+
 .task-completed .v-list-item-title {
   opacity: 0.7;
 }
+
 .selected-task.task-completed {
   background-color: rgba(156, 39, 176, 0.3) !important;
   border-left: 3px solid #e040fb;
 }
+
 .selected-task.task-completed:hover {
   background-color: rgba(156, 39, 176, 0.4) !important;
 }
@@ -1068,6 +919,7 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   background-color: rgba(76, 175, 80, 0.3);
   transition: background-color 0.2s;
 }
+
 .play-btn:hover {
   background-color: rgba(76, 175, 80, 0.5);
 }
@@ -1076,6 +928,7 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   background-color: rgba(244, 67, 54, 0.3);
   transition: background-color 0.2s;
 }
+
 .stop-btn:hover {
   background-color: rgba(244, 67, 54, 0.5);
 }
@@ -1140,6 +993,7 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   opacity: 0.6;
   transition: opacity 0.2s;
 }
+
 .edit-time-btn:hover {
   opacity: 1;
 }
@@ -1147,6 +1001,7 @@ watch([hours, minutes, seconds], updateTotalSeconds);
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.5s;
 }
+
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
@@ -1154,6 +1009,7 @@ watch([hours, minutes, seconds], updateTotalSeconds);
 :deep(.v-checkbox-btn) {
   margin-right: 8px;
 }
+
 :deep(.v-checkbox-btn--selected .v-selection-control__input) {
   color: #4CAF50 !important;
 }
@@ -1198,24 +1054,4 @@ watch([hours, minutes, seconds], updateTotalSeconds);
   color: #ff9800 !important;
 }
 
-/* Mobile-friendly adjustments */
-@media (max-width: 600px) {
-  .timesheet-card {
-    margin: 8px;
-    border-radius: 8px;
-  }
-  .timer {
-    font-size: 2rem;
-  }
-  .selected-task-banner {
-    margin-left: 8px;
-    padding: 8px 12px;
-  }
-  .task-selection-indicator {
-    right: 10px;
-    bottom: 10px;
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-}
 </style>
