@@ -27,6 +27,18 @@ import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.FontFactory;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
 
 
 @Service
@@ -328,10 +340,8 @@ public class TimeSheetService {
      * @return PDF en tant que tableau d'octets
      */
     public byte[] exportTimeSheetsToPdf(Integer userId, LocalDate startDate, LocalDate endDate) {
-        // Récupérer les feuilles de temps de l'utilisateur
+        // Retrieve timesheets for the given user and date range
         List<TimeSheet> sheets = timeSheetRepository.findByUserId(userId);
-
-        // Filtrer par date si nécessaire
         if (startDate != null && endDate != null) {
             sheets = sheets.stream()
                     .filter(ts -> !ts.getEntryDate().isBefore(startDate) && !ts.getEntryDate().isAfter(endDate))
@@ -346,55 +356,60 @@ public class TimeSheetService {
                     .collect(Collectors.toList());
         }
 
-        // Préparer le document PDF
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         Document document = new Document();
         try {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            // Ajouter un titre au document
-            document.add(new Paragraph("Export des feuilles de temps"));
-            document.add(new Paragraph("Utilisateur : " + userId));
-            document.add(new Paragraph(" ")); // Ligne vide pour espacer
+            // Create fonts according to the theme
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.WHITE);
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
+            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
 
-            // Créer une table PDF avec 9 colonnes (comme dans le CSV)
-            PdfPTable table = new PdfPTable(9);
+            // Define your primary color from your theme (e.g., "#1a237e")
+            BaseColor primaryColor = new BaseColor(26, 35, 126);
+
+            // Add a background title
+            Paragraph title = new Paragraph("Export des feuilles de temps", titleFont);
+            title.setAlignment(Element.ALIGN_CENTER);
+            PdfPTable titleTable = new PdfPTable(1);
+            titleTable.setWidthPercentage(100);
+            PdfPCell titleCell = new PdfPCell(title);
+            titleCell.setBackgroundColor(primaryColor);
+            titleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            titleCell.setBorder(PdfPCell.NO_BORDER);
+            titleTable.addCell(titleCell);
+            document.add(titleTable);
+            document.add(new Paragraph(" ")); // Add some spacing
+
+            // Create table with 5 columns (after removing ID and icon columns)
+            PdfPTable table = new PdfPTable(5);
             table.setWidthPercentage(100);
             table.setSpacingBefore(10f);
             table.setSpacingAfter(10f);
 
-            // Ajouter des cellules d'en-tête
-            addTableHeaderCell(table, "ID");
-            addTableHeaderCell(table, "Date");
-            addTableHeaderCell(table, "Icon");
-            addTableHeaderCell(table, "UserID");
-            addTableHeaderCell(table, "TaskID");
-            addTableHeaderCell(table, "TaskName");
-            addTableHeaderCell(table, "Duration");
-            addTableHeaderCell(table, "StartDate");
-            addTableHeaderCell(table, "EndDate");
+            // Add styled header cells for remaining columns: Date, TaskName, Duration, StartDate, EndDate
+            addStyledHeaderCell(table, "Date", headerFont, primaryColor);
+            addStyledHeaderCell(table, "TaskName", headerFont, primaryColor);
+            addStyledHeaderCell(table, "Duration", headerFont, primaryColor);
+            addStyledHeaderCell(table, "StartDate", headerFont, primaryColor);
+            addStyledHeaderCell(table, "EndDate", headerFont, primaryColor);
 
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-            // Pour chaque feuille de temps, ajouter une ligne par tâche
+            // Fill table rows with timesheet data (one row per task)
             for (TimeSheet ts : sheets) {
-                // Récupérer les tâches associées à la feuille de temps
+                // Retrieve tasks associated with the timesheet, using repository call
                 List<TimeSheetTask> tasks = timeSheetTaskRepository.findByTimeSheetId(ts.getId());
                 for (TimeSheetTask task : tasks) {
-                    table.addCell(ts.getId().toString());
-                    table.addCell(ts.getEntryDate() != null ? ts.getEntryDate().format(dateFormatter) : "");
-                    table.addCell(ts.getIcon() != null ? ts.getIcon() : "");
-                    table.addCell(ts.getUser() != null ? ts.getUser().getId().toString() : "");
-                    table.addCell(task.getTaskId().toString());
-
-                    // Récupérer le nom de la tâche, remplacer les virgules par des points-virgules pour éviter les problèmes
+                    // Add only the needed columns
+                    table.addCell(createCell(ts.getEntryDate().format(dateFormatter), cellFont));
                     String taskName = task.getTask() != null ? task.getTask().getName() : "Unknown";
-                    table.addCell(taskName.replace(",", ";"));
-
-                    table.addCell(task.getDuration() != null ? task.getDuration().toString() : "");
-                    table.addCell(ts.getStartDate() != null ? ts.getStartDate().format(dateFormatter) : "");
-                    table.addCell(ts.getEndDate() != null ? ts.getEndDate().format(dateFormatter) : "");
+                    table.addCell(createCell(taskName.replace(",", ";"), cellFont));
+                    table.addCell(createCell(task.getDuration() != null ? task.getDuration().toString() : "", cellFont));
+                    table.addCell(createCell(ts.getStartDate() != null ? ts.getStartDate().format(dateFormatter) : "", cellFont));
+                    table.addCell(createCell(ts.getEndDate() != null ? ts.getEndDate().format(dateFormatter) : "", cellFont));
                 }
             }
 
@@ -406,13 +421,26 @@ public class TimeSheetService {
         return baos.toByteArray();
     }
 
+
+
     /**
-     * Ajoute une cellule d'en-tête à la table PDF
+     * Adds a styled header cell to a table.
      */
-    private void addTableHeaderCell(PdfPTable table, String text) {
-        PdfPCell cell = new PdfPCell(new Paragraph(text));
+    private void addStyledHeaderCell(PdfPTable table, String text, Font font, BaseColor backgroundColor) {
+        PdfPCell cell = new PdfPCell(new Paragraph(text, font));
+        cell.setBackgroundColor(backgroundColor);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
         table.addCell(cell);
+    }
+
+    /**
+     * Creates a table cell with given text and font.
+     */
+    private PdfPCell createCell(String text, Font font) {
+        PdfPCell cell = new PdfPCell(new Paragraph(text, font));
+        cell.setPadding(4f);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        return cell;
     }
 
 
