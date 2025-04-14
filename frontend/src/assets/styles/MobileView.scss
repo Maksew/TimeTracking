@@ -1,0 +1,235 @@
+.timesheet-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.group-select {
+  max-width: 180px;
+}
+
+.validity-select {
+  max-width: 150px;
+}
+
+.timesheet-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 8px;
+}
+
+.timesheet-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.timesheet-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.timesheet-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.timesheet-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.selected-task {
+  background-color: rgba(156, 39, 176, 0.3) !important;
+  border-left: 3px solid #e040fb;
+}
+
+.selected-task-banner {
+  background-color: rgba(156, 39, 176, 0.3);
+  border-left: 3px solid #e040fb;
+  padding: 10px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: auto;
+  margin-left: 20px;
+}
+
+.selected-task-banner .task-name {
+  font-weight: 500;
+  color: #fafafa;
+}
+
+.task-completed {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  transition: background-color 0.3s ease;
+}
+
+.task-completed:hover {
+  background-color: rgba(76, 175, 80, 0.2) !important;
+}
+
+.task-completed .v-list-item-title {
+  opacity: 0.7;
+}
+
+.selected-task.task-completed {
+  background-color: rgba(156, 39, 176, 0.3) !important;
+  border-left: 3px solid #e040fb;
+}
+
+.selected-task.task-completed:hover {
+  background-color: rgba(156, 39, 176, 0.4) !important;
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+  padding: 0;
+}
+
+.timer {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.play-btn {
+  background-color: rgba(76, 175, 80, 0.3);
+  transition: background-color 0.2s;
+}
+
+.play-btn:hover {
+  background-color: rgba(76, 175, 80, 0.5);
+}
+
+.stop-btn {
+  background-color: rgba(244, 67, 54, 0.3);
+  transition: background-color 0.2s;
+}
+
+.stop-btn:hover {
+  background-color: rgba(244, 67, 54, 0.5);
+}
+
+.task-selection-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  color: white;
+  z-index: 100;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  max-width: 80%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-label {
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.personal-label {
+  color: #e040fb;
+}
+
+.time-display {
+  background-color: rgba(26, 35, 126, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.success-notification {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 2000;
+  max-width: 90%;
+  background-color: rgba(76, 175, 80, 0.9);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: fadeInOut 3s ease;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-20px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.edit-time-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.edit-time-btn:hover {
+  opacity: 1;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+:deep(.v-checkbox-btn) {
+  margin-right: 8px;
+}
+
+:deep(.v-checkbox-btn--selected .v-selection-control__input) {
+  color: #4CAF50 !important;
+}
+
+.category-chip {
+  font-weight: 600 !important;
+  letter-spacing: 0.3px;
+  opacity: 0.95;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  padding: 0 8px !important;
+}
+
+.personal-indicator {
+  background-color: rgba(156, 39, 176, 0.3) !important;
+  border: 1px solid rgba(156, 39, 176, 0.7) !important;
+  color: white !important;
+}
+
+.group-indicator {
+  background-color: rgba(124, 77, 255, 0.2) !important;
+  color: white !important;
+  border: 1px solid rgba(124, 77, 255, 0.5) !important;
+}
+
+:deep(.v-chip__content) {
+  font-weight: 600 !important;
+  color: white !important;
+}
+
+.validity-indicator {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.text-error {
+  color: #f44336 !important;
+}
+
+.text-orange {
+  color: #ff9800 !important;
+}
