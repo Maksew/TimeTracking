@@ -14,7 +14,7 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**") // Apply CORS to API endpoints
-                        .allowedOrigins("http://localhost:5173") // Allow frontend requests
+                        .allowedOrigins("http://localhost:5173, http://localhost:5174, http://localhost:5175, http://localhost:5176, http://localhost:5177") // Allow frontend requests (
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
