@@ -13,7 +13,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**") // Apply CORS to API endpoints
-                .allowedOrigins("http://localhost:5173, http://localhost:5174, http://localhost:5175, http://localhost:5176, https://time-tracking.koyeb.app") // Allow frontend requests
+                .allowedOrigins("*") // Allow frontend requests
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
