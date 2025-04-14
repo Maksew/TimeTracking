@@ -20,3 +20,5 @@ service:
         value: "8989"
       - name: JAVA_TOOL_OPTIONS
         value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+      - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+        value: "org.postgresql.Driver"
