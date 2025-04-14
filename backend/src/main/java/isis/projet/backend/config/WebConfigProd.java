@@ -10,7 +10,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@Profile("deploy") // Cette configuration ne sera active qu'en environnement de production
+@Profile("deploy")
 public class WebConfigProd implements WebMvcConfigurer {
 
     @Override

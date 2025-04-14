@@ -112,12 +112,10 @@ public class TimeSheetService {
      * @return Feuille de temps mise à jour
      */
     public TimeSheet updateTimeSheet(TimeSheet updatedTimeSheet) {
-        // Vérifier si l'ID est présent et si la feuille de temps existe dans la base de données
         if (updatedTimeSheet.getId() == null || !timeSheetRepository.existsById(updatedTimeSheet.getId())) {
             throw new RuntimeException("Feuille de temps introuvable");
         }
 
-        // Récupérer la feuille de temps existante
         Optional<TimeSheet> optionalExisting = timeSheetRepository.findById(updatedTimeSheet.getId());
         if (!optionalExisting.isPresent()) {
             throw new RuntimeException("Feuille de temps introuvable");
@@ -169,7 +167,6 @@ public class TimeSheetService {
         timeSheetTask.setTimeSheet(timeSheet);
         timeSheetTask.setTask(task);
 
-        // Save the association entity
         return timeSheetTaskRepository.save(timeSheetTask);
     }
 
@@ -208,30 +205,24 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithUser(Integer timeSheetId, Integer userId, String accessLevel) {
-        // Retrieve the timesheet from the database
         TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
                 .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
 
-        // Retrieve the user from the database
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Create the composite key for the share
         TimeSheetShareUserId shareId = new TimeSheetShareUserId(timeSheet.getId(), user.getId());
 
         if (timeSheetShareUserRepository.existsById(shareId)) {
-            // Update the access level if the share already exists
             TimeSheetShareUser existingShare = timeSheetShareUserRepository.findById(shareId).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareUserRepository.save(existingShare);
         } else {
-            // Create a new share record with proper references
             TimeSheetShareUser shareUser = new TimeSheetShareUser();
             shareUser.setTimeSheetId(timeSheet.getId());
             shareUser.setUserId(user.getId());
             shareUser.setAccessLevel(accessLevel);
 
-            // Optionally set the associated entities as well
             shareUser.setTimeSheet(timeSheet);
             shareUser.setUser(user);
 
@@ -246,30 +237,24 @@ public class TimeSheetService {
      * @param accessLevel Niveau d'accès (READ, WRITE)
      */
     public void shareTimeSheetWithGroup(Integer timeSheetId, Integer groupId, String accessLevel) {
-        // Retrieve the timesheet from the database
         TimeSheet timeSheet = timeSheetRepository.findById(timeSheetId)
                 .orElseThrow(() -> new RuntimeException("TimeSheet introuvable"));
 
-        // Retrieve the group from the database
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Groupe introuvable"));
 
-        // Create the composite key for the share record
         TimeSheetShareGroupId id = new TimeSheetShareGroupId(timeSheet.getId(), group.getId());
 
         if (timeSheetShareGroupRepository.existsById(id)) {
-            // Update the access level if the share record already exists
             TimeSheetShareGroup existingShare = timeSheetShareGroupRepository.findById(id).get();
             existingShare.setAccessLevel(accessLevel);
             timeSheetShareGroupRepository.save(existingShare);
         } else {
-            // Create a new share record with proper references
             TimeSheetShareGroup shareGroup = new TimeSheetShareGroup();
             shareGroup.setTimeSheetId(timeSheet.getId());
             shareGroup.setGroupId(group.getId());
             shareGroup.setAccessLevel(accessLevel);
 
-            // Optionally set the associated entities to maintain consistency
             shareGroup.setTimeSheet(timeSheet);
             shareGroup.setGroup(group);
 
@@ -285,10 +270,8 @@ public class TimeSheetService {
      * @return Données CSV
      */
     public byte[] exportTimeSheetsToCsv(Integer userId, LocalDate startDate, LocalDate endDate) {
-        // Récupérer les feuilles de temps de l'utilisateur
         List<TimeSheet> timeSheets = timeSheetRepository.findByUserId(userId);
 
-        // Filtrer par date si nécessaire
         if (startDate != null && endDate != null) {
             timeSheets = timeSheets.stream()
                     .filter(ts -> !ts.getEntryDate().isBefore(startDate) && !ts.getEntryDate().isAfter(endDate))
@@ -303,7 +286,6 @@ public class TimeSheetService {
                     .collect(Collectors.toList());
         }
 
-        // Construire le contenu CSV
         StringBuilder csvContent = new StringBuilder();
 
         // En-tête
@@ -340,7 +322,6 @@ public class TimeSheetService {
      * @return PDF en tant que tableau d'octets
      */
     public byte[] exportTimeSheetsToPdf(Integer userId, LocalDate startDate, LocalDate endDate) {
-        // Retrieve timesheets for the given user and date range
         List<TimeSheet> sheets = timeSheetRepository.findByUserId(userId);
         if (startDate != null && endDate != null) {
             sheets = sheets.stream()
@@ -362,15 +343,12 @@ public class TimeSheetService {
             PdfWriter.getInstance(document, baos);
             document.open();
 
-            // Create fonts according to the theme
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.WHITE);
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
             Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
 
-            // Define your primary color from your theme (e.g., "#1a237e")
             BaseColor primaryColor = new BaseColor(26, 35, 126);
 
-            // Add a background title
             Paragraph title = new Paragraph("Export des feuilles de temps", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             PdfPTable titleTable = new PdfPTable(1);
@@ -381,9 +359,8 @@ public class TimeSheetService {
             titleCell.setBorder(PdfPCell.NO_BORDER);
             titleTable.addCell(titleCell);
             document.add(titleTable);
-            document.add(new Paragraph(" ")); // Add some spacing
+            document.add(new Paragraph(" "));
 
-            // Create table with 5 columns (after removing ID and icon columns)
             PdfPTable table = new PdfPTable(5);
             table.setWidthPercentage(100);
             table.setSpacingBefore(10f);
@@ -398,12 +375,9 @@ public class TimeSheetService {
 
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-            // Fill table rows with timesheet data (one row per task)
             for (TimeSheet ts : sheets) {
-                // Retrieve tasks associated with the timesheet, using repository call
                 List<TimeSheetTask> tasks = timeSheetTaskRepository.findByTimeSheetId(ts.getId());
                 for (TimeSheetTask task : tasks) {
-                    // Add only the needed columns
                     table.addCell(createCell(ts.getEntryDate().format(dateFormatter), cellFont));
                     String taskName = task.getTask() != null ? task.getTask().getName() : "Unknown";
                     table.addCell(createCell(taskName.replace(",", ";"), cellFont));

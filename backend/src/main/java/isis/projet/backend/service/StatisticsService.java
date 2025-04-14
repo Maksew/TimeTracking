@@ -6,16 +6,11 @@ import isis.projet.backend.repository.TaskRepository;
 import isis.projet.backend.repository.TimeSheetRepository;
 import isis.projet.backend.repository.TimeSheetTaskRepository;
 import isis.projet.backend.repository.UserRepository;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,29 +36,21 @@ public class StatisticsService {
      * @return Statistiques globales
      */
     public StatisticsDTO.StatisticsResponse getUserStatistics(Integer userId) {
-        // Vérifier si l'utilisateur existe
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Récupérer les feuilles de temps de l'utilisateur
         List<TimeSheet> timeSheets = timeSheetRepository.findByUserId(userId);
 
         if (timeSheets.isEmpty()) {
             return createEmptyStatistics(user);
         }
 
-        // Calculer les statistiques de résumé
         StatisticsDTO.UserStatsSummary summary = calculateUserSummary(user, timeSheets);
-
-        // Calculer les statistiques par catégorie
         List<StatisticsDTO.CategoryStats> categories = calculateCategoryStats(timeSheets);
-
-        // Calculer les statistiques par période
         StatisticsDTO.PeriodStats dailyStats = calculatePeriodStats(timeSheets, "day");
         StatisticsDTO.PeriodStats weeklyStats = calculatePeriodStats(timeSheets, "week");
         StatisticsDTO.PeriodStats monthlyStats = calculatePeriodStats(timeSheets, "month");
 
-        // Construire la réponse complète
         return StatisticsDTO.StatisticsResponse.builder()
                 .summary(summary)
                 .categories(categories)
@@ -79,12 +66,10 @@ public class StatisticsService {
      * @return Statistiques du groupe
      */
     public Map<Integer, StatisticsDTO.UserStatsSummary> getGroupStatistics(Integer groupId) {
-        // Récupérer les utilisateurs du groupe
-        List<UserGroup> userGroups = new ArrayList<>(); // À remplacer par le repository approprié
+        List<UserGroup> userGroups = new ArrayList<>();
 
         Map<Integer, StatisticsDTO.UserStatsSummary> userStats = new HashMap<>();
 
-        // Pour chaque utilisateur du groupe, calculer des statistiques de base
         for (UserGroup userGroup : userGroups) {
             User user = userGroup.getUser();
             List<TimeSheet> timeSheets = timeSheetRepository.findByUserId(user.getId());
@@ -105,14 +90,11 @@ public class StatisticsService {
      * @return Statistiques pour la période
      */
     public StatisticsDTO.StatisticsResponse getStatisticsByPeriod(Integer userId, LocalDate startDate, LocalDate endDate) {
-        // Vérifier si l'utilisateur existe
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Récupérer les feuilles de temps de l'utilisateur pour la période spécifique
         List<TimeSheet> allTimeSheets = timeSheetRepository.findByUserId(userId);
 
-        // Filtrer les feuilles de temps par période
         List<TimeSheet> timeSheets = allTimeSheets.stream()
                 .filter(ts -> !ts.getEntryDate().isBefore(startDate) && !ts.getEntryDate().isAfter(endDate))
                 .collect(Collectors.toList());
@@ -121,7 +103,6 @@ public class StatisticsService {
             return createEmptyStatistics(user);
         }
 
-        // Calculer les statistiques comme d'habitude mais uniquement pour la période spécifiée
         StatisticsDTO.UserStatsSummary summary = calculateUserSummary(user, timeSheets);
         List<StatisticsDTO.CategoryStats> categories = calculateCategoryStats(timeSheets);
         StatisticsDTO.PeriodStats periodStats = calculateCustomPeriodStats(timeSheets, startDate, endDate);
@@ -144,14 +125,11 @@ public class StatisticsService {
         int completedTasks = 0;
         int totalTimeInMinutes = 0;
 
-        // Pour chaque feuille de temps, calculer les statistiques
         for (TimeSheet timeSheet : timeSheets) {
             List<TimeSheetTask> timeSheetTasks = timeSheetTaskRepository.findByTimeSheetId(timeSheet.getId());
 
             totalTasks += timeSheetTasks.size();
 
-            // Dans cet exemple, nous n'avons pas de moyen de savoir si une tâche est complétée
-            // Supposons que toutes les tâches avec une durée > 0 sont complétées
             for (TimeSheetTask tst : timeSheetTasks) {
                 totalTimeInMinutes += tst.getDuration();
                 if (tst.getDuration() > 0) {
@@ -179,11 +157,9 @@ public class StatisticsService {
      * @return Liste des statistiques par catégorie
      */
     private List<StatisticsDTO.CategoryStats> calculateCategoryStats(List<TimeSheet> timeSheets) {
-        // Regrouper les tâches par catégorie (nous utiliserons la répétition comme catégorie temporaire)
         Map<String, List<Task>> tasksByCategory = new HashMap<>();
         Map<Integer, Integer> taskTimeMap = new HashMap<>();
 
-        // Pour chaque feuille de temps, récupérer les tâches et leurs durées
         for (TimeSheet timeSheet : timeSheets) {
             List<TimeSheetTask> timeSheetTasks = timeSheetTaskRepository.findByTimeSheetId(timeSheet.getId());
 
@@ -200,13 +176,11 @@ public class StatisticsService {
                         tasksByCategory.get(category).add(task);
                     }
 
-                    // Stocker le temps par tâche
                     taskTimeMap.put(task.getId(), taskTimeMap.getOrDefault(task.getId(), 0) + tst.getDuration());
                 }
             }
         }
 
-        // Calculer les statistiques pour chaque catégorie
         List<StatisticsDTO.CategoryStats> result = new ArrayList<>();
         int totalTime = taskTimeMap.values().stream().mapToInt(Integer::intValue).sum();
 
@@ -224,16 +198,15 @@ public class StatisticsService {
                 StatisticsDTO.TaskStats taskStats = StatisticsDTO.TaskStats.builder()
                         .taskId(task.getId())
                         .taskName(task.getName())
-                        .icon("mdi-checkbox-marked-circle-outline") // Icône par défaut
+                        .icon("mdi-checkbox-marked-circle-outline")
                         .totalTimeInMinutes(taskTime)
-                        .completed(taskTime > 0) // Supposons qu'une tâche avec du temps est complétée
+                        .completed(taskTime > 0)
                         .percentageOfTotal(totalTime > 0 ? (double) taskTime / totalTime * 100 : 0)
                         .build();
 
                 taskStatsList.add(taskStats);
             }
 
-            // Trier les tâches par temps total (décroissant)
             taskStatsList.sort((a, b) -> b.getTotalTimeInMinutes().compareTo(a.getTotalTimeInMinutes()));
 
             StatisticsDTO.CategoryStats categoryStats = StatisticsDTO.CategoryStats.builder()
@@ -248,7 +221,6 @@ public class StatisticsService {
             result.add(categoryStats);
         }
 
-        // Trier les catégories par temps total (décroissant)
         result.sort((a, b) -> b.getTotalTimeInMinutes().compareTo(a.getTotalTimeInMinutes()));
 
         return result;
@@ -264,7 +236,6 @@ public class StatisticsService {
         DateTimeFormatter formatter;
         Map<String, Integer> timeDistribution = new HashMap<>();
 
-        // Définir le formatteur en fonction du type de période
         switch (periodType) {
             case "day":
                 formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -283,11 +254,9 @@ public class StatisticsService {
         int totalTasks = 0;
         int completedTasks = 0;
 
-        // Pour chaque feuille de temps
         for (TimeSheet timeSheet : timeSheets) {
             String periodKey;
 
-            // Déterminer la clé de période
             if ("week".equals(periodType)) {
                 WeekFields weekFields = WeekFields.of(Locale.getDefault());
                 int weekNumber = timeSheet.getEntryDate().get(weekFields.weekOfWeekBasedYear());
@@ -298,12 +267,9 @@ public class StatisticsService {
                 periodKey = timeSheet.getEntryDate().format(formatter);
             }
 
-            // Récupérer les tâches pour cette feuille de temps
             List<TimeSheetTask> timeSheetTasks = timeSheetTaskRepository.findByTimeSheetId(timeSheet.getId());
-
             totalTasks += timeSheetTasks.size();
 
-            // Calculer le temps total pour cette période
             for (TimeSheetTask tst : timeSheetTasks) {
                 int duration = tst.getDuration();
                 totalTimeInMinutes += duration;
@@ -312,7 +278,6 @@ public class StatisticsService {
                     completedTasks++;
                 }
 
-                // Ajouter au temps de distribution
                 timeDistribution.put(periodKey, timeDistribution.getOrDefault(periodKey, 0) + duration);
             }
         }
@@ -341,17 +306,13 @@ public class StatisticsService {
         int totalTasks = 0;
         int completedTasks = 0;
 
-        // Pour chaque feuille de temps dans la période
         for (TimeSheet timeSheet : timeSheets) {
             if (!timeSheet.getEntryDate().isBefore(startDate) && !timeSheet.getEntryDate().isAfter(endDate)) {
                 String periodKey = timeSheet.getEntryDate().format(formatter);
 
-                // Récupérer les tâches pour cette feuille de temps
                 List<TimeSheetTask> timeSheetTasks = timeSheetTaskRepository.findByTimeSheetId(timeSheet.getId());
-
                 totalTasks += timeSheetTasks.size();
 
-                // Calculer le temps total pour cette période
                 for (TimeSheetTask tst : timeSheetTasks) {
                     int duration = tst.getDuration();
                     totalTimeInMinutes += duration;
@@ -360,7 +321,6 @@ public class StatisticsService {
                         completedTasks++;
                     }
 
-                    // Ajouter au temps de distribution
                     timeDistribution.put(periodKey, timeDistribution.getOrDefault(periodKey, 0) + duration);
                 }
             }

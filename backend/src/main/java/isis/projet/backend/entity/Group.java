@@ -23,7 +23,7 @@ public class Group {
     @Column(name = "invit_code")
     private String invitCode;
 
-    // Relation inverse avec USER_GROUP (pas dans le SQL mais utile pour JPA)
+    // Relation inverse avec USER_GROUP
     @OneToMany(mappedBy = "group")
     @JsonManagedReference("group-usergroups")
     private List<UserGroup> userGroups = new ArrayList<>();

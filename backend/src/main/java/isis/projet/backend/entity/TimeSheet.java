@@ -45,7 +45,6 @@ public class TimeSheet {
     @JsonBackReference("user-timesheets")
     private User user;
 
-    // Other relationships remain the same...
     @OneToMany(mappedBy = "timeSheet")
     @JsonManagedReference("timesheet-tasks")
     private List<TimeSheetTask> timeSheetTasks = new ArrayList<>();

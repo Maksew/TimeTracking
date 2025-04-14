@@ -1,4 +1,4 @@
-import './assets/main.css' // optional global styles
+import './assets/main.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
@@ -8,7 +8,7 @@ import * as directives from 'vuetify/directives'
 import VueApexCharts from 'vue3-apexcharts'
 
 import 'vuetify/styles'
-import '@mdi/font/css/materialdesignicons.css' // For MDI icons
+import '@mdi/font/css/materialdesignicons.css'
 
 import App from './App.vue'
 import router from './router'
@@ -18,7 +18,7 @@ const vuetify = createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'dark', // or 'light', if you prefer
+    defaultTheme: 'dark',
     themes: {
       dark: {
         colors: {

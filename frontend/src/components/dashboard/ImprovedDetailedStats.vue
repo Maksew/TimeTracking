@@ -195,7 +195,7 @@ const getGroupColor = (groupId) => {
     '#8e24aa', '#5e35b1', '#3949ab'
   ];
 
-  if (!groupId) return '#9c27b0'; // Couleur par défaut
+  if (!groupId) return '#9c27b0';
 
   // Convertir l'ID en nombre si ce n'est pas déjà le cas
   const numericId = typeof groupId === 'number' ? groupId : parseInt(groupId, 10);
@@ -206,7 +206,6 @@ const getGroupColor = (groupId) => {
   return groupColors[colorIndex];
 };
 
-// Charger les statistiques
 const loadStatistics = async (silent = false) => {
   try {
     if (!silent) loading.value = true;
@@ -295,7 +294,6 @@ const processTimeSheetsData = (allTimeSheets, tasksByIdMap) => {
       }
     }
 
-    // Initialiser les statistiques pour cette feuille
     const title = timeSheet.title || `Feuille du ${new Date(timeSheet.entryDate).toLocaleDateString()}`;
     const timeSheetId = timeSheet.id;
 

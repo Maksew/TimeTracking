@@ -47,17 +47,11 @@ public class GroupService {
         if (group == null) return;
 
         try {
-            // Utiliser la requête JPQL personnalisée pour charger le groupe avec tous ses membres en une seule opération
             Optional<Group> fullGroupOpt = groupRepository.findByIdWithAllMembers(group.getId());
-
             if (fullGroupOpt.isEmpty()) return;
-
             Group fullGroup = fullGroupOpt.get();
-
-            // Remplacer la liste userGroups du groupe par celle du groupe complet
             group.setUserGroups(fullGroup.getUserGroups());
 
-            // Vérifier si le nombre de membres correspond à celui attendu
             long expectedCount = groupRepository.countMembersByGroupId(group.getId());
             int actualCount = group.getUserGroups() != null ? group.getUserGroups().size() : 0;
 
@@ -66,17 +60,14 @@ public class GroupService {
                         ". Attendu: " + expectedCount + ", Actuel: " + actualCount);
             }
 
-            // Si userGroups est vide ou null, on a un problème
             if (group.getUserGroups() == null || group.getUserGroups().isEmpty()) {
                 System.out.println("Aucun membre trouvé pour le groupe " + group.getName() +
                         ". Tentative de récupération alternative...");
 
-                // Récupération alternative des UserGroup
                 List<UserGroup> allUserGroups = userGroupRepository.findByGroupId(group.getId());
                 group.setUserGroups(allUserGroups);
             }
 
-            // Maintenant qu'on a les UserGroup, charger les détails des utilisateurs si nécessaire
             if (group.getUserGroups() != null) {
                 for (UserGroup userGroup : group.getUserGroups()) {
                     if (userGroup.getUser() == null) {
@@ -124,11 +115,8 @@ public class GroupService {
 
     @Transactional
     public void deleteGroup(Integer groupId) {
-        // Retrieve associated UserGroup entries
         List<UserGroup> associations = userGroupRepository.findByGroupId(groupId);
-        // Delete associations explicitly
         userGroupRepository.deleteAll(associations);
-        // Now delete the group
         groupRepository.deleteById(groupId);
     }
 
@@ -141,8 +129,6 @@ public class GroupService {
         }
 
         Group group = groupOpt.get();
-
-        // Vérifier si l'utilisateur est déjà membre
         boolean alreadyMember = userGroupRepository.findByGroupId(group.getId())
                 .stream()
                 .anyMatch(ug -> ug.getUserId().equals(user.getId()));

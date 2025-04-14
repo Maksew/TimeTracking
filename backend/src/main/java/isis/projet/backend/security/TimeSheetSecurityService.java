@@ -18,7 +18,6 @@ public class TimeSheetSecurityService {
     public boolean isOwner(Integer timesheetId, UserDetails currentUser) {
         TimeSheet timesheet = timeSheetRepository.findById(timesheetId).orElse(null);
         if (timesheet == null) return false;
-        // Compare the authenticated user's email (username) with the timesheet owner’s email.
         return currentUser.getUsername().equals(timesheet.getUser().getEmail());
     }
 }

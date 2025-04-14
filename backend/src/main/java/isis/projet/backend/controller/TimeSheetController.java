@@ -439,7 +439,6 @@ public class TimeSheetController {
             @RequestBody Map<String, Boolean> completionData,
             Authentication authentication) {
         try {
-            // Vérifier les permissions avec la nouvelle fonction plus permissive
             if (!canUserUpdateTaskTime(timeSheetId, authentication)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Vous n'avez pas la permission de modifier cette feuille de temps");
@@ -471,13 +470,11 @@ public class TimeSheetController {
             @PathVariable Integer taskId,
             Authentication authentication) {
         try {
-            // Vérifier les permissions
             if (!canUserEditTimeSheet(timeSheetId, authentication)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Vous n'avez pas la permission de modifier cette feuille de temps");
             }
 
-            // Appeler le service pour supprimer la tâche de la feuille de temps
             timeSheetService.removeTaskFromTimeSheet(timeSheetId, taskId);
 
             return ResponseEntity.ok().build();

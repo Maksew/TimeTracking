@@ -23,7 +23,7 @@ public class Task {
     @Column(name = "repetition", length = 50)
     private String repetition;
 
-    // Relation inverse avec TIME_SHEET_TASK (pas dans le SQL mais utile pour JPA)
+    // Relation inverse avec TIME_SHEET_TASK
     @OneToMany(mappedBy = "task")
     @JsonManagedReference("task-timesheettasks")
     private List<TimeSheetTask> timeSheetTasks = new ArrayList<>();

@@ -34,7 +34,6 @@ public class GroupController {
 
         Optional<Group> group = groupService.getGroupById(id);
 
-        // Si le paramètre includeMembers est true, charger les détails des membres
         if (includeMembers && group.isPresent()) {
             groupService.loadGroupMembersDetails(group.get());
         }
@@ -50,7 +49,6 @@ public class GroupController {
 
         List<Group> groups = groupService.getGroupsByUserId(userId);
 
-        // Si le paramètre includeMembers est true, charger les détails des membres pour chaque groupe
         if (includeMembers) {
             for (Group group : groups) {
                 groupService.loadGroupMembersDetails(group);

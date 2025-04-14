@@ -1,6 +1,3 @@
-// src/utils/groupUtils.js
-
-// Palette de couleurs pour les groupes
 const groupColors = [
   '#673ab7', '#3f51b5', '#2196f3', '#9c27b0',
   '#5e35b1', '#3949ab', '#1e88e5',

@@ -1,4 +1,3 @@
-// src/router/authGuard.js
 import { useAuthStore } from '@/stores/auth'
 import { isTokenExpired } from '@/util/util'
 
@@ -43,6 +42,5 @@ export function authGuard(to, from, next) {
     }
   }
 
-  // Autoriser la navigation
   next()
 }

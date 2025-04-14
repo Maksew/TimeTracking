@@ -32,19 +32,14 @@ public class UserService {
     }
 
     public User updateUser(User user) {
-        // Retrieve the existing user from the database
         User existingUser = userRepository.findById(user.getId())
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Update allowed fields
         existingUser.setPseudo(user.getPseudo());
         existingUser.setEmail(user.getEmail());
-        // Check if password is provided and if it's different (i.e. not already encoded)
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
-            // It's a good idea to check if the password is already encoded, but usually you expect plain text here
             existingUser.setPassword(passwordEncoder.encode(user.getPassword()));
         }
-        // Update role or other fields if necessary
         existingUser.setRole(user.getRole());
 
         return userRepository.save(existingUser);
