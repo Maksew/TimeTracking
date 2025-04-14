@@ -407,9 +407,35 @@
       </v-card>
     </v-dialog>
   </v-card>
+
+  <!-- Success Dialog -->
+  <v-dialog v-model="showSuccessPopup" max-width="400">
+    <v-card color="#283593" dark>
+      <v-card-title class="headline">
+        <v-icon start class="mr-2">mdi-trophy</v-icon>
+        Mission accomplie !
+      </v-card-title>
+      <v-card-text>
+        ‘{{ lastUpdatedTaskName }}’ cochée avec succès! 🎉
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" @click="showSuccessPopup = false">
+          Fermer
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
+
+const showSuccessPopup = ref(false)
+const lastUpdatedTaskName = ref('')
+
+
+
+
 import { ref, watch, onMounted, computed, onUnmounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import timeSheetService from '@/services/timeSheetService';
@@ -822,6 +848,7 @@ const saveConfirmedTime = async () => {
   try {
     // Vérifier que la valeur est positive
     if (confirmedSeconds.value <= 0) {
+      showConfirmDialog.value = false
       return; // Empêcher la sauvegarde si le temps est 0 ou négatif
     }
 
@@ -837,6 +864,16 @@ const saveConfirmedTime = async () => {
           selectedTask.value.taskId,
           confirmedSeconds.value
         );
+
+        // Update local data if needed
+        selectedTask.value.duration = confirmedSeconds.value
+        // Show success popup
+        lastUpdatedTaskName.value = selectedTask.value.name || ''
+        showSuccessPopup.value = true
+        // Auto-close after 3 seconds
+        setTimeout(() => {
+          showSuccessPopup.value = false
+        }, 5000)
 
         // Mettre à jour localement
         if (selectedTask.value) {
