@@ -69,17 +69,6 @@ const timeSheets = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
-const currentDate = computed(() => {
-  const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  const months = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-  ];
-
-  const now = new Date();
-  return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-});
-
 // Méthode pour rafraîchir toutes les statistiques
 const refreshAllStats = () => {
   console.log('Rafraîchissement des statistiques...');
@@ -151,15 +140,6 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-.date-header {
-  color: white;
-  font-weight: 500;
-  font-size: 1.25rem;
-  margin: 0;
-  padding: 16px 24px;
-  padding-top: 0;
-  margin-bottom: 16px;
-}
 
 .dashboard-container {
   display: grid;
