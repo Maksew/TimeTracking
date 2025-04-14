@@ -58,7 +58,7 @@ export async function httpInterceptor(url, options = {}) {
  * Traite les réponses et gère les erreurs courantes
  */
 export async function doAjaxRequestWithAuth(url, options = {}) {
-  const baseUrl = 'http://localhost:8989'; // Base URL de votre API
+  const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app'; // Base URL de votre API
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
   const response = await httpInterceptor(fullUrl, options);
