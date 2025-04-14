@@ -56,10 +56,10 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider())
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
+                        // Permettre l'accès public aux pages principales
+                        .requestMatchers("/", "/index.html", "/static/**",
+                                "/favicon.ico", "/login", "/register").permitAll()
                         // Documentation API – allow Swagger endpoints
                         .requestMatchers("/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
@@ -67,15 +67,11 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
                                 "/webjars/**").permitAll()
-                        // Public endpoints for authentication and development (e.g. H2 console)
+                        // Endpoints API publics
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .headers(headers -> headers
-                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
-                )
                 .build();
     }
 }
