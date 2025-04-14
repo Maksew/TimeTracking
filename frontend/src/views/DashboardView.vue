@@ -29,7 +29,7 @@
           <ImprovedDetailedStats ref="detailedStatsRef" class="mt-4" />
         </div>
 
-        <!-- Colonne de droite: Feuilles de temps - MAINTENANT FIXÉE EN HAUTEUR -->
+        <!-- Colonne de droite: Feuilles de temps -->
         <div class="dashboard-right">
           <TimeSheetComponent
             ref="timeSheetComponentRef"

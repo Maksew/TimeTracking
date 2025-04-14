@@ -22,25 +22,20 @@ const loadAllData = async (silent = false) => {
     if (!silent) loading.value = true;
     error.value = null;
 
-    // 1. Charger les statistiques standard de l'utilisateur
     statistics.value = await statisticsService.getCurrentUserStatistics();
 
-    // 2. Charger les groupes de l'utilisateur
     userGroups.value = await groupService.getUserGroups();
 
-    // 3. Récupérer les feuilles personnelles et partagées avec l'utilisateur
     const [ownedTimeSheets, sharedTimeSheets] = await Promise.all([
       timeSheetService.getUserTimeSheets(),
       timeSheetService.getSharedTimeSheets()
     ]);
 
-    // 4. Récupérer les feuilles partagées avec les groupes de l'utilisateur
     const groupPromises = userGroups.value.map(group =>
       timeSheetService.getGroupTimeSheets(group.id)
     );
     const groupSheets = await Promise.all(groupPromises);
 
-    // 5. Fusionner toutes les feuilles (en éliminant les doublons)
     let allSheets = [...ownedTimeSheets, ...sharedTimeSheets];
     groupSheets.forEach(groupSheet => {
       if (Array.isArray(groupSheet)) {
@@ -48,11 +43,8 @@ const loadAllData = async (silent = false) => {
       }
     });
 
-    // Dédupliquer par ID
     const uniqueSheets = [...new Map(allSheets.map(sheet => [sheet.id, sheet])).values()];
     timeSheets.value = uniqueSheets;
-
-    // 6. Extraire toutes les tâches de ces feuilles
     const allTasks = [];
     uniqueSheets.forEach(sheet => {
       if (sheet.timeSheetTasks && Array.isArray(sheet.timeSheetTasks)) {
@@ -97,7 +89,6 @@ const formatTimeWorked = (seconds) => {
 };
 
 const timeWorked = computed(() => {
-  // Calculer le temps total à partir de toutes les tâches
   const totalSeconds = allTimeSheetTasks.value.reduce((sum, task) => {
     return sum + (task.duration || 0);
   }, 0);
@@ -105,27 +96,22 @@ const timeWorked = computed(() => {
   return formatTimeWorked(totalSeconds);
 });
 
-// Fonction de rafraîchissement des données
 const refreshData = async (silent = false) => {
   await loadAllData(silent);
 };
 
-// Exposer la méthode de rafraîchissement pour le parent
 defineExpose({
   refreshData
 });
 
-// Chargement des données au montage du composant
 onMounted(() => {
   refreshData();
 
-  // Configurer un rafraîchissement périodique
   refreshInterval.value = setInterval(() => {
-    refreshData(true); // Mode silencieux pour ne pas perturber l'interface
-  }, 30000); // Toutes les 30 secondes
+    refreshData(true);
+  }, 30000);
 });
 
-// Nettoyage lors du démontage
 onUnmounted(() => {
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value);

@@ -1,29 +1,51 @@
 <template>
-  <div>
-    <h3 style="margin-top: 0.5rem;">Export your time sheets</h3>
-    <div class="export-buttons">
-      <v-text-field
-        v-model="startDate"
-        label="Start Date"
-        type="date"
-        dense
-        style="max-width: 150px;"
-      ></v-text-field>
-      <v-text-field
-        v-model="endDate"
-        label="End Date"
-        type="date"
-        dense
-        style="max-width: 150px;"
-      ></v-text-field>
-      <v-btn color="primary" @click="handleExportCSV" small style="min-width: 70px;">
-        CSV
+  <v-menu>
+    <template v-slot:activator="{ props }">
+      <v-btn icon v-bind="props" class="mr-2">
+        <v-icon>mdi-download</v-icon>
+        <v-tooltip activator="parent" location="bottom">Exporter</v-tooltip>
       </v-btn>
-      <v-btn color="secondary" @click="handleExportPDF" small style="min-width: 70px;">
-        PDF
-      </v-btn>
-    </div>
-  </div>
+    </template>
+    <v-card min-width="300" color="#283593">
+      <v-card-text>
+        <p class="text-subtitle-2 mb-2">Export your time sheets</p>
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex flex-wrap align-center gap-2 mb-2">
+            <v-text-field
+              v-model="startDate"
+              label="Start Date"
+              type="date"
+              density="compact"
+              hide-details
+              bg-color="#1a237e"
+              class="mb-2 mr-2"
+              style="max-width: 140px;"
+            ></v-text-field>
+            <v-text-field
+              v-model="endDate"
+              label="End Date"
+              type="date"
+              density="compact"
+              hide-details
+              bg-color="#1a237e"
+              class="mb-2"
+              style="max-width: 140px;"
+            ></v-text-field>
+          </div>
+          <div class="d-flex gap-2">
+            <v-btn color="primary" block @click="handleExportCSV">
+              <v-icon start>mdi-file-delimited</v-icon>
+              CSV
+            </v-btn>
+            <v-btn color="secondary" block @click="handleExportPDF">
+              <v-icon start>mdi-file-pdf-box</v-icon>
+              PDF
+            </v-btn>
+          </div>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-menu>
 </template>
 
 <script setup>
@@ -79,7 +101,6 @@ onMounted(() => {
 .export-buttons {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin: 1rem 0;
+  gap: 0.5rem;
 }
 </style>

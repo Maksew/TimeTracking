@@ -4,6 +4,9 @@
       <v-icon size="small" class="mr-2">mdi-file-document-outline</v-icon>
       Feuille de temps
       <v-spacer></v-spacer>
+
+      <ExportComponent />
+
       <v-btn icon small to="/editTimesheet" class="ml-2">
         <v-icon>mdi-plus</v-icon>
         <v-tooltip activator="parent" location="bottom">Nouvelle feuille</v-tooltip>
@@ -443,6 +446,7 @@ import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
 import { defineEmits } from 'vue';
 import Export from "@/components/export/Export.vue";
+import ExportComponent from '@/components/export/Export.vue';
 
 const authStore = useAuthStore();
 
