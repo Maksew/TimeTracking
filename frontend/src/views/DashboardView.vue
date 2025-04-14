@@ -1,3 +1,50 @@
+<template>
+  <div class="dashboard">
+    <!-- Message de bienvenue personnalisé -->
+    <WelcomeMessage :username="user ? user.pseudo : ''" />
+
+    <!-- Date -->
+    <h2 class="date-header">Aujourd'hui, {{ currentDate }}</h2>
+
+    <!-- État de chargement -->
+    <v-overlay v-if="loading" class="d-flex align-center justify-center">
+      <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+    </v-overlay>
+
+    <!-- Message d'erreur -->
+    <v-alert v-if="error && !loading" type="error" class="mb-4">
+      {{ error }}
+      <template v-slot:append>
+        <v-btn variant="text" @click="error = null">Fermer</v-btn>
+      </template>
+    </v-alert>
+
+    <!-- Contenu principal -->
+    <template v-if="!loading">
+      <!-- Métriques et feuilles de temps -->
+      <div class="dashboard-container">
+        <!-- Colonne de gauche: Métriques et statistiques -->
+        <div class="dashboard-left">
+          <!-- Métriques -->
+          <StatsOverview ref="statsOverviewRef" />
+
+          <!-- Statistiques détaillées -->
+          <ImprovedDetailedStats ref="detailedStatsRef" class="mt-4" />
+        </div>
+
+        <!-- Colonne de droite: Feuilles de temps - MAINTENANT FIXÉE EN HAUTEUR -->
+        <div class="dashboard-right">
+          <TimeSheetComponent
+            ref="timeSheetComponentRef"
+            @task-updated="handleTaskUpdated"
+            @data-changed="handleDataChanged"
+          />
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
@@ -95,58 +142,9 @@ onMounted(async () => {
     loading.value = false;
   }
 });
-
 </script>
 
-<template>
-  <div class="dashboard">
-    <!-- Message de bienvenue personnalisé -->
-    <WelcomeMessage :username="user ? user.pseudo : ''" />
-
-    <!-- Date -->
-    <h2 class="date-header">Aujourd'hui, {{ currentDate }}</h2>
-
-    <!-- État de chargement -->
-    <v-overlay v-if="loading" class="d-flex align-center justify-center">
-      <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-    </v-overlay>
-
-    <!-- Message d'erreur -->
-    <v-alert v-if="error && !loading" type="error" class="mb-4">
-      {{ error }}
-      <template v-slot:append>
-        <v-btn variant="text" @click="error = null">Fermer</v-btn>
-      </template>
-    </v-alert>
-
-    <!-- Contenu principal -->
-    <template v-if="!loading">
-      <!-- Métriques et feuilles de temps -->
-      <div class="dashboard-container">
-        <!-- Colonne de gauche: Métriques et statistiques -->
-        <div class="dashboard-left">
-          <!-- Métriques -->
-          <StatsOverview ref="statsOverviewRef" />
-
-          <!-- Statistiques détaillées -->
-          <ImprovedDetailedStats ref="detailedStatsRef" class="mt-4" />
-        </div>
-
-        <!-- Colonne de droite: Feuilles de temps -->
-        <div class="dashboard-right">
-          <TimeSheetComponent
-            ref="timeSheetComponentRef"
-            @task-updated="handleTaskUpdated"
-            @data-changed="handleDataChanged"
-          />
-        </div>
-      </div>
-    </template>
-  </div>
-</template>
-
 <style scoped>
-
 .dashboard {
   background-color: #1a237e;
   min-height: calc(100vh - 64px);
@@ -166,14 +164,14 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-
 .dashboard-container {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr);
+  /* Ajuster les proportions pour mieux correspondre à la maquette */
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.3fr);
   gap: 16px;
   padding: 0 16px 16px 16px;
   flex: 1;
-  overflow: hidden;
+  min-height: 0; /* Important pour éviter le débordement */
 }
 
 /* En dessous de 960px, passer en une seule colonne */
@@ -194,13 +192,36 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  max-height: calc(100vh - 150px); /* Ajusté pour tenir compte de l'en-tête */
 }
 
 .dashboard-right {
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 150px); /* Même hauteur que dashboard-left */
   overflow: hidden;
-  height: 100%;
 }
 
+/* Personnalisation des scrollbars pour une meilleure intégration */
+.dashboard-left::-webkit-scrollbar,
+.dashboard-right::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-left::-webkit-scrollbar-track,
+.dashboard-right::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.dashboard-left::-webkit-scrollbar-thumb,
+.dashboard-right::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.dashboard-left::-webkit-scrollbar-thumb:hover,
+.dashboard-right::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
 </style>
