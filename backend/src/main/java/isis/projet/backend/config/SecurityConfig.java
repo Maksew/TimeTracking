@@ -11,16 +11,26 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        // Disable CSRF protection for simplicity on endpoints that do not require it.
-        // This is not a recommended default for production, so adjust accordingly.
-        http.csrf().disable();
 
-        // Permit requests to the registration endpoint (and possibly others)
-        http.authorizeRequests()
-                .antMatchers("/api/auth/register").permitAll() // allow registration without authentication
+        // Disable CSRF protection for specific endpoints to allow public access
+        http.csrf()
+                .ignoringAntMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/refresh"
+                )
+                .and()
+                .authorizeRequests()
+                // Permit all access to registration, login, and token refresh endpoints.
+                .antMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/refresh"
+                ).permitAll()
+                // All other endpoints require authentication.
                 .anyRequest().authenticated();
 
-        // Log security configuration details (this is rudimentary logging)
-        System.out.println("Security configuration: CSRF disabled, /api/auth/register permitted for all.");
+        // Optionally log security configuration details for debugging
+        System.out.println("Security configuration: CSRF disabled for public endpoints and permitted for registration, login, and refresh.");
     }
 }
