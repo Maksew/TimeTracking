@@ -27,13 +27,11 @@ public class WebConfigProd implements WebMvcConfigurer {
     public CorsFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
-
-        // Permettre toutes les origines
         config.addAllowedOrigin("*");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
-
-        source.registerCorsConfiguration("/api/**", config);
+        config.setAllowCredentials(false); // Important: passer à false avec addAllowedOrigin("*")
+        source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
     }
 }
