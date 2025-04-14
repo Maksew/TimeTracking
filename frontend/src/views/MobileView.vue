@@ -97,6 +97,7 @@
             class="validity-select"
           />
         </div>
+        <Export />
         <!-- Group Label -->
         <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
           <span class="font-weight-medium" :class="{ 'personal-label': selectedGroup === 'personnel' }">
@@ -276,6 +277,7 @@ import ConfirmTimeDialog from '@/components/mobile/ConfirmTimeDialog.vue';
 import ResetTimeDialog from '@/components/mobile/ResetTimeDialog.vue';
 import NoTimeDialog from '@/components/mobile/NoTimeDialog.vue';
 import SuccessNotification from '@/components/mobile/SuccessNotification.vue';
+import Export from "@/components/export/Export.vue";
 
 const authStore = useAuthStore();
 const emit = defineEmits(['task-updated', 'data-changed']);
