@@ -1,13 +1,36 @@
 <script setup>
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { RouterView } from 'vue-router';
 import AppHeader from '@/components/layout/AppHeader.vue';
+import MobileView from './views/MobileView.vue';
+
+// Create a reactive variable to store the window width
+const windowWidth = ref(window.innerWidth);
+
+// Function to update the window width
+const onResize = () => {
+  windowWidth.value = window.innerWidth;
+};
+
+// Add and remove the resize event listener appropriately
+onMounted(() => window.addEventListener('resize', onResize));
+onUnmounted(() => window.removeEventListener('resize', onResize));
+
+// Computed property that determines if the device is mobile (width <= 768px)
+const isMobile = computed(() => windowWidth.value <= 768);
 </script>
 
 <template>
   <v-app theme="dark" class="app-container">
     <AppHeader />
     <v-main class="main-content pa-0 ma-0">
-      <RouterView />
+      <!-- Conditionally render MobileView for mobile devices and RouterView for desktop -->
+      <template v-if="isMobile">
+        <MobileView />
+      </template>
+      <template v-else>
+        <RouterView />
+      </template>
     </v-main>
   </v-app>
 </template>
