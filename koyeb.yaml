@@ -14,11 +14,13 @@ service:
         value: "postgres"
       - name: DB_PASSWORD
         secret: SUPABASE_PASSWORD
-      - name: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: "update"
       - name: SERVER_PORT
         value: "8989"
       - name: JAVA_TOOL_OPTIONS
         value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
       - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
         value: "org.postgresql.Driver"
+      - name: SPRING_JPA_DATABASE_PLATFORM
+        value: "org.hibernate.dialect.PostgreSQLDialect"
+      - name: SPRING_H2_CONSOLE_ENABLED
+        value: "false"

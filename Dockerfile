@@ -12,4 +12,5 @@ WORKDIR /app
 COPY --from=builder /app/backend/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
 ENV PORT=8989
-CMD ["java", "-Dserver.port=${PORT}", "-jar", "app.jar"]
+ENV SPRING_PROFILES_ACTIVE=deploy
+CMD ["java", "-Dserver.port=${PORT}", "-Dspring.profiles.active=${SPRING_PROFILES_ACTIVE}", "-jar", "app.jar"]
