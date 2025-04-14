@@ -115,6 +115,8 @@
           ></v-select>
         </div>
 
+        <Export />
+
         <!-- Afficher le label du groupe actuel -->
         <div v-if="selectedGroup || filteredTimeSheets.length > 0" class="group-label mb-3">
           <span class="font-weight-medium" :class="{'personal-label': selectedGroup === 'personnel'}">
@@ -414,6 +416,7 @@ import timeSheetService from '@/services/timeSheetService';
 import taskService from '@/services/taskService';
 import groupService from '@/services/groupService';
 import { defineEmits } from 'vue';
+import Export from "@/components/export/Export.vue";
 
 const authStore = useAuthStore();
 
