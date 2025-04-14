@@ -70,33 +70,76 @@ export async function doAjaxRequestWithAuth(url, options = {}) {
   const baseUrl = 'https://intermediate-pansie-maksew-0cc92781.koyeb.app';
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
-  const response = await httpInterceptor(fullUrl, options);
-
-  // Vérifier si la réponse est vide ou non-JSON
-  if (response.status === 204) {
-    // 204 No Content - retourner un objet vide ou une valeur appropriée
-    return {};
-  }
-
-  // Vérifier si la réponse a du contenu
-  const text = await response.text();
-  if (!text) {
-    // Réponse vide - retourner un objet vide
-    return {};
-  }
+  console.log(`Envoi de requête à: ${fullUrl}`);
+  console.log('Options:', JSON.stringify({
+    method: options.method,
+    headers: options.headers,
+    body: options.body ? '(présent)' : '(absent)'
+  }));
 
   try {
-    // Essayer de parser le JSON
-    const result = JSON.parse(text);
+    const response = await httpInterceptor(fullUrl, options);
 
-    // Si la réponse n'est pas OK, lever une exception
-    if (!response.ok) throw result;
+    console.log(`Réponse reçue de ${fullUrl}:`, {
+      status: response.status,
+      statusText: response.statusText
+    });
 
-    // Tout s'est bien passé, retourner le résultat
-    return result;
-  } catch (e) {
-    // Erreur de parsing JSON
-    console.error('Erreur de parsing JSON:', text);
-    throw new Error('Réponse invalide du serveur: ' + text);
+    // Traitement spécial pour les erreurs 403 (forbidden) et 401 (unauthorized)
+    if (response.status === 403 || response.status === 401) {
+      const responseText = await response.clone().text();
+      console.log(`Contenu de la réponse ${response.status}:`, responseText);
+      console.log('Headers de réponse:', Object.fromEntries([...response.headers]));
+
+      // Si on reçoit une erreur 403, il est possible que ce soit une erreur CORS ou un problème d'authentification
+      if (response.status === 403) {
+        throw new Error(`Accès refusé (403): ${responseText || 'Pas de détails disponibles'}`);
+      }
+    }
+
+    // Vérifier si la réponse est vide ou non-JSON
+    if (response.status === 204) {
+      // 204 No Content - retourner un objet vide ou une valeur appropriée
+      return {};
+    }
+
+    // Récupérer le contenu textuel de la réponse
+    const text = await response.text();
+    if (!text) {
+      // Réponse vide - retourner un objet vide
+      return {};
+    }
+
+    try {
+      // Essayer de parser le JSON
+      const result = JSON.parse(text);
+
+      // Si la réponse n'est pas OK, lever une exception avec les détails
+      if (!response.ok) {
+        const errorMessage = result.error || result.message || JSON.stringify(result);
+        throw new Error(`Erreur ${response.status}: ${errorMessage}`);
+      }
+
+      // Tout s'est bien passé, retourner le résultat
+      console.log('Réponse JSON valide reçue');
+      return result;
+    } catch (e) {
+      // Erreur de parsing JSON
+      console.error('Erreur de parsing JSON:', e);
+      console.error('Texte reçu:', text);
+
+      // Si le texte semble être du HTML, informer clairement dans l'erreur
+      if (text.includes('<html') || text.includes('<!DOCTYPE')) {
+        throw new Error(`Réponse HTML reçue au lieu de JSON. Statut: ${response.status}. Vérifiez la configuration CORS.`);
+      } else {
+        throw new Error(`Réponse invalide du serveur (${response.status}): ${text.substring(0, 100)}...`);
+      }
+    }
+  } catch (error) {
+    // Capturer toutes les erreurs, y compris les erreurs réseau
+    console.error('Erreur lors de la requête:', error);
+
+    // Relancer l'erreur pour qu'elle puisse être traitée par l'appelant
+    throw error;
   }
 }
