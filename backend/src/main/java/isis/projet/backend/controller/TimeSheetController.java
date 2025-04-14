@@ -364,6 +364,33 @@ public class TimeSheetController {
         return new ResponseEntity<>(csvData, headers, HttpStatus.OK);
     }
 
+
+    /**
+     * Exporte les feuilles de temps de l'utilisateur en PDF.
+     * @param authentication Informations d'authentification
+     * @param startDate Date de début optionnelle
+     * @param endDate Date de fin optionnelle
+     * @return Fichier PDF
+     */
+    @GetMapping("/export/pdf")
+    public ResponseEntity<byte[]> exportTimeSheetsToPdf(
+            Authentication authentication,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        byte[] pdfData = timeSheetService.exportTimeSheetsToPdf(userDetails.getId(), startDate, endDate);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("filename", "timesheets.pdf");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+
+        return new ResponseEntity<>(pdfData, headers, HttpStatus.OK);
+    }
+
+
+
     /**
      * Met à jour la durée d'une tâche dans une feuille de temps
      * @param timeSheetId ID de la feuille de temps
