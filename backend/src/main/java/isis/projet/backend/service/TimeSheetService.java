@@ -18,6 +18,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
+
+
 @Service
 public class TimeSheetService {
 
@@ -307,6 +318,103 @@ public class TimeSheetService {
 
         return csvContent.toString().getBytes(StandardCharsets.UTF_8);
     }
+
+
+    /**
+     * Exports the user's timesheets as a PDF file.
+     * @param userId ID de l'utilisateur
+     * @param startDate Date de début (optionnelle)
+     * @param endDate Date de fin (optionnelle)
+     * @return PDF en tant que tableau d'octets
+     */
+    public byte[] exportTimeSheetsToPdf(Integer userId, LocalDate startDate, LocalDate endDate) {
+        // Récupérer les feuilles de temps de l'utilisateur
+        List<TimeSheet> sheets = timeSheetRepository.findByUserId(userId);
+
+        // Filtrer par date si nécessaire
+        if (startDate != null && endDate != null) {
+            sheets = sheets.stream()
+                    .filter(ts -> !ts.getEntryDate().isBefore(startDate) && !ts.getEntryDate().isAfter(endDate))
+                    .collect(Collectors.toList());
+        } else if (startDate != null) {
+            sheets = sheets.stream()
+                    .filter(ts -> !ts.getEntryDate().isBefore(startDate))
+                    .collect(Collectors.toList());
+        } else if (endDate != null) {
+            sheets = sheets.stream()
+                    .filter(ts -> !ts.getEntryDate().isAfter(endDate))
+                    .collect(Collectors.toList());
+        }
+
+        // Préparer le document PDF
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document();
+        try {
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            // Ajouter un titre au document
+            document.add(new Paragraph("Export des feuilles de temps"));
+            document.add(new Paragraph("Utilisateur : " + userId));
+            document.add(new Paragraph(" ")); // Ligne vide pour espacer
+
+            // Créer une table PDF avec 9 colonnes (comme dans le CSV)
+            PdfPTable table = new PdfPTable(9);
+            table.setWidthPercentage(100);
+            table.setSpacingBefore(10f);
+            table.setSpacingAfter(10f);
+
+            // Ajouter des cellules d'en-tête
+            addTableHeaderCell(table, "ID");
+            addTableHeaderCell(table, "Date");
+            addTableHeaderCell(table, "Icon");
+            addTableHeaderCell(table, "UserID");
+            addTableHeaderCell(table, "TaskID");
+            addTableHeaderCell(table, "TaskName");
+            addTableHeaderCell(table, "Duration");
+            addTableHeaderCell(table, "StartDate");
+            addTableHeaderCell(table, "EndDate");
+
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+            // Pour chaque feuille de temps, ajouter une ligne par tâche
+            for (TimeSheet ts : sheets) {
+                // Récupérer les tâches associées à la feuille de temps
+                List<TimeSheetTask> tasks = timeSheetTaskRepository.findByTimeSheetId(ts.getId());
+                for (TimeSheetTask task : tasks) {
+                    table.addCell(ts.getId().toString());
+                    table.addCell(ts.getEntryDate() != null ? ts.getEntryDate().format(dateFormatter) : "");
+                    table.addCell(ts.getIcon() != null ? ts.getIcon() : "");
+                    table.addCell(ts.getUser() != null ? ts.getUser().getId().toString() : "");
+                    table.addCell(task.getTaskId().toString());
+
+                    // Récupérer le nom de la tâche, remplacer les virgules par des points-virgules pour éviter les problèmes
+                    String taskName = task.getTask() != null ? task.getTask().getName() : "Unknown";
+                    table.addCell(taskName.replace(",", ";"));
+
+                    table.addCell(task.getDuration() != null ? task.getDuration().toString() : "");
+                    table.addCell(ts.getStartDate() != null ? ts.getStartDate().format(dateFormatter) : "");
+                    table.addCell(ts.getEndDate() != null ? ts.getEndDate().format(dateFormatter) : "");
+                }
+            }
+
+            document.add(table);
+            document.close();
+        } catch (DocumentException de) {
+            throw new RuntimeException("Erreur lors de la génération du PDF: " + de.getMessage());
+        }
+        return baos.toByteArray();
+    }
+
+    /**
+     * Ajoute une cellule d'en-tête à la table PDF
+     */
+    private void addTableHeaderCell(PdfPTable table, String text) {
+        PdfPCell cell = new PdfPCell(new Paragraph(text));
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(cell);
+    }
+
 
     /**
      * Met à jour la durée d'une tâche dans une feuille de temps
