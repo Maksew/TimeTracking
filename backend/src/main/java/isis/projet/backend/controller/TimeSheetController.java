@@ -406,8 +406,7 @@ public class TimeSheetController {
             @RequestBody Map<String, Integer> taskData,
             Authentication authentication) {
         try {
-            // Vérifier les permissions
-            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+            if (!canUserUpdateTaskTime(timeSheetId, authentication)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Vous n'avez pas la permission de modifier cette feuille de temps");
             }
@@ -440,8 +439,8 @@ public class TimeSheetController {
             @RequestBody Map<String, Boolean> completionData,
             Authentication authentication) {
         try {
-            // Vérifier les permissions
-            if (!canUserEditTimeSheet(timeSheetId, authentication)) {
+            // Vérifier les permissions avec la nouvelle fonction plus permissive
+            if (!canUserUpdateTaskTime(timeSheetId, authentication)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body("Vous n'avez pas la permission de modifier cette feuille de temps");
             }
@@ -485,5 +484,32 @@ public class TimeSheetController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    private boolean canUserUpdateTaskTime(Integer timeSheetId, Authentication authentication) {
+        JwtUserDetails userDetails = (JwtUserDetails) authentication.getPrincipal();
+        Integer userId = userDetails.getId();
+
+        Optional<TimeSheet> timeSheetOpt = timeSheetService.getTimeSheetById(timeSheetId);
+        if (timeSheetOpt.isEmpty()) {
+            return false;
+        }
+
+        TimeSheet timeSheet = timeSheetOpt.get();
+        if (timeSheet.getUser() != null && timeSheet.getUser().getId().equals(userId)) {
+            return true;
+        }
+
+        if (timeSheet.getSharedWithGroups() != null && !timeSheet.getSharedWithGroups().isEmpty()) {
+            for (TimeSheetShareGroup shareGroup : timeSheet.getSharedWithGroups()) {
+                Integer groupId = shareGroup.getGroupId();
+
+                if (userGroupService.isGroupMember(userId, groupId)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

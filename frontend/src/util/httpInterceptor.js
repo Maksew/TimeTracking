@@ -1,4 +1,3 @@
-// src/util/httpInterceptor.js
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { API_BASE_URL } from '@/config/api.config';
