@@ -14,7 +14,7 @@ export function authGuard(to, from, next) {
       // Rediriger vers la page de connexion
       return next({
         path: '/login',
-        query: { redirect: to.fullPath } // Garder l'URL pour rediriger après connexion
+        query: { redirect: to.fullPath }
       })
     }
 
