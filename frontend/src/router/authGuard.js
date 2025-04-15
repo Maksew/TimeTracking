@@ -11,7 +11,7 @@ export function authGuard(to, from, next) {
   if (to.matched.some(record => record.meta.requiresAuth)) {
     // Vérifier si l'utilisateur est authentifié
     if (!authStore.isAuthenticated || !authStore.token) {
-      // Rediriger vers la page de connexion
+      // Rediriger vers la page de connexions
       return next({
         path: '/login',
         query: { redirect: to.fullPath }
